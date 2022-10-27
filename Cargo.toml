@@ -1,0 +1,16 @@
+[package]
+name = "ts2tex"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.66"
+clap = { version = "4.0.18", features = ["derive"] }
+serde = { version = "1.0.147", features = ["derive"] }
+serde_json = "1.0.87"
+tree-sitter = "0.20.9"
+tree-sitter-highlight = "0.20.1"
+tree-sitter-loader = "0.20.0"
+tree-sitter-rust = "0.20.1"
