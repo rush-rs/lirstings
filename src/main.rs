@@ -91,6 +91,12 @@ impl ThemeValue {
 #[derive(clap::Parser)]
 struct Cli {
     file: PathBuf,
+
+    #[arg(short, long)]
+    raw: bool,
+
+    #[arg(long)]
+    raw_queries: bool,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -100,6 +106,11 @@ fn main() -> anyhow::Result<()> {
     let config: Ts2TexConfig = serde_json::from_reader(config_file_reader)?;
 
     let code = fs::read_to_string(&cli.file)?;
+
+    if cli.raw {
+        print!("{}", code.replace('{', "×{").replace('}', "×}"));
+        return Ok(());
+    }
 
     let mut highlight_names = Vec::with_capacity(config.theme.len());
     let mut highlight_styles = Vec::with_capacity(config.theme.len());
@@ -128,6 +139,7 @@ fn main() -> anyhow::Result<()> {
         let injection_file = filetype_dir.join("injections.scm");
         let locals_file = filetype_dir.join("locals.scm");
 
+        // TODO: check for `; inherits: x` comments
         if highlights_file.is_file() {
             highlights_query = fs::read_to_string(highlights_file)?;
         }
@@ -139,9 +151,11 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
-    highlights_query = reverse_queries(lang, &highlights_query)?;
-    injection_query = reverse_queries(lang, &injection_query)?;
-    locals_query = reverse_queries(lang, &locals_query)?;
+    if !cli.raw_queries {
+        highlights_query = process_queries(lang, &highlights_query)?;
+        injection_query = process_queries(lang, &injection_query)?;
+        locals_query = process_queries(lang, &locals_query)?;
+    }
 
     let mut highlighter = Highlighter::new();
     let mut highlight_config =
@@ -169,7 +183,7 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn reverse_queries(lang: Language, source: &str) -> anyhow::Result<String> {
+fn process_queries(lang: Language, source: &str) -> anyhow::Result<String> {
     let query = Query::new(lang, source)?;
     let start_bytes: Vec<_> = (0..query.pattern_count())
         .map(|index| {
