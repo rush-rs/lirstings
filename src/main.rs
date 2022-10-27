@@ -26,6 +26,8 @@ enum ThemeValue {
         #[serde(default)]
         underline: bool,
         #[serde(default)]
+        strikethrough: bool,
+        #[serde(default)]
         italic: bool,
         #[serde(default)]
         bold: bool,
@@ -44,6 +46,7 @@ impl ThemeValue {
                     | ThemeValue::Object {
                         color,
                         underline: false,
+                        strikethrough: false,
                         italic: false,
                         bold: false,
                     } => {
@@ -53,13 +56,18 @@ impl ThemeValue {
                     ThemeValue::Object {
                         color,
                         underline,
+                        strikethrough,
                         italic,
                         bold,
                     } => {
                         out += &format!("×textcolor[HTML]{{{color}}}{{", color = &color[1..]);
                         let mut brace_count = 1;
                         if *underline {
-                            out += "×underline{×ttfamily{}";
+                            out += "×uline{";
+                            brace_count += 1;
+                        }
+                        if *strikethrough {
+                            out += "×sout{";
                             brace_count += 1;
                         }
                         if *italic {
