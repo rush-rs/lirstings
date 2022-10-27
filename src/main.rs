@@ -13,7 +13,7 @@ use tree_sitter_loader::{Config, Loader};
 #[derive(serde::Deserialize)]
 struct Ts2TexConfig {
     theme: HashMap<String, ThemeValue>,
-    query_search_dirs: Vec<PathBuf>,
+    query_search_dirs: Vec<String>,
     parser_search_dirs: Vec<PathBuf>,
 }
 
@@ -133,21 +133,23 @@ fn main() -> anyhow::Result<()> {
     let mut highlights_query = String::new();
     let mut injection_query = String::new();
     let mut locals_query = String::new();
-    for dir in &config.query_search_dirs {
-        let filetype_dir = dir.join(&parser_name);
-        let highlights_file = filetype_dir.join("highlights.scm");
-        let injection_file = filetype_dir.join("injections.scm");
-        let locals_file = filetype_dir.join("locals.scm");
+    for glob_str in &config.query_search_dirs {
+        for dir in glob::glob(glob_str)?.filter_map(Result::ok) {
+            let filetype_dir = dir.join(&parser_name);
+            let highlights_file = filetype_dir.join("highlights.scm");
+            let injection_file = filetype_dir.join("injections.scm");
+            let locals_file = filetype_dir.join("locals.scm");
 
-        // TODO: check for `; inherits: x` comments
-        if highlights_file.is_file() {
-            highlights_query = fs::read_to_string(highlights_file)?;
-        }
-        if injection_file.is_file() {
-            injection_query = fs::read_to_string(injection_file)?;
-        }
-        if locals_file.is_file() {
-            locals_query = fs::read_to_string(locals_file)?;
+            // TODO: check for `; inherits: x` comments
+            if highlights_file.is_file() {
+                highlights_query = fs::read_to_string(highlights_file)?;
+            }
+            if injection_file.is_file() {
+                injection_query = fs::read_to_string(injection_file)?;
+            }
+            if locals_file.is_file() {
+                locals_query = fs::read_to_string(locals_file)?;
+            }
         }
     }
 
