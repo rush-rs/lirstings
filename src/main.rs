@@ -11,6 +11,7 @@ mod config;
 mod theme;
 
 #[derive(clap::Parser)]
+#[clap(author, version, about)]
 struct Cli {
     file: PathBuf,
 
@@ -35,7 +36,7 @@ fn main() -> anyhow::Result<()> {
         });
 
     let code = fs::read_to_string(&cli.file)
-        .with_context(|| format!("Could not read `{}`", cli.file.to_string_lossy()))?;
+        .with_context(|| format!("Could not read input file at `{}`", cli.file.to_string_lossy()))?;
 
     if cli.raw {
         print!("{}", code.replace('{', "×{").replace('}', "×}"));
