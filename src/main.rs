@@ -35,8 +35,12 @@ fn main() -> anyhow::Result<()> {
             process::exit(0)
         });
 
-    let code = fs::read_to_string(&cli.file)
-        .with_context(|| format!("Could not read input file at `{}`", cli.file.to_string_lossy()))?;
+    let code = fs::read_to_string(&cli.file).with_context(|| {
+        format!(
+            "Could not read input file at `{}`",
+            cli.file.to_string_lossy()
+        )
+    })?;
 
     if cli.raw {
         print!("{}", code.replace('{', "×{").replace('}', "×}"));
@@ -66,8 +70,10 @@ fn main() -> anyhow::Result<()> {
         }
     };
 
-    // TODO: is this unwrap safe?
-    let parser_name = lang_config.scope.as_ref().unwrap().replace("source.", "");
+    let parser_name = match lang_config.scope.as_ref() {
+        Some(scope) => scope.replace("source.", ""),
+        None => bail!("Parser has no scope specified"),
+    };
 
     let mut highlights_query = String::new();
     let mut injection_query = String::new();
