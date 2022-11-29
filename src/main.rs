@@ -1,92 +1,13 @@
-use std::{
-    collections::HashMap,
-    fs::{self, File},
-    io::BufReader,
-    path::PathBuf,
-};
+use std::{collections::HashMap, fs, path::PathBuf, process};
 
+use anyhow::{bail, Context, Result};
 use clap::Parser;
 use tree_sitter::{Language, Query, QueryPredicateArg};
 use tree_sitter_highlight::{Highlight, HighlightConfiguration, HighlightEvent, Highlighter};
 use tree_sitter_loader::{Config, Loader};
 
-#[derive(serde::Deserialize)]
-struct Ts2TexConfig {
-    theme: HashMap<String, ThemeValue>,
-    query_search_dirs: Vec<String>,
-    parser_search_dirs: Vec<PathBuf>,
-}
-
-#[derive(serde::Deserialize)]
-#[serde(untagged)]
-enum ThemeValue {
-    Color(String),
-    Object {
-        color: String,
-        #[serde(default)]
-        underline: bool,
-        #[serde(default)]
-        strikethrough: bool,
-        #[serde(default)]
-        italic: bool,
-        #[serde(default)]
-        bold: bool,
-    },
-}
-
-impl ThemeValue {
-    pub fn write(&self, text: &str) {
-        let text = text.replace('{', "×{").replace('}', "×}");
-        let lines: Vec<_> = text
-            .lines()
-            .map(|line| {
-                let mut out = String::new();
-                match self {
-                    ThemeValue::Color(color)
-                    | ThemeValue::Object {
-                        color,
-                        underline: false,
-                        strikethrough: false,
-                        italic: false,
-                        bold: false,
-                    } => {
-                        out +=
-                            &format!("×textcolor[HTML]{{{color}}}{{{line}}}", color = &color[1..])
-                    }
-                    ThemeValue::Object {
-                        color,
-                        underline,
-                        strikethrough,
-                        italic,
-                        bold,
-                    } => {
-                        out += &format!("×textcolor[HTML]{{{color}}}{{", color = &color[1..]);
-                        let mut brace_count = 1;
-                        if *underline {
-                            out += "×uline{";
-                            brace_count += 1;
-                        }
-                        if *strikethrough {
-                            out += "×sout{";
-                            brace_count += 1;
-                        }
-                        if *italic {
-                            out += "×textit{";
-                            brace_count += 1;
-                        }
-                        if *bold {
-                            out += "×textbf{";
-                            brace_count += 1;
-                        }
-                        out += &format!("{line}{braces}", braces = "}".repeat(brace_count));
-                    }
-                }
-                out
-            })
-            .collect();
-        print!("{}", lines.join("\n"));
-    }
-}
+mod config;
+mod theme;
 
 #[derive(clap::Parser)]
 struct Cli {
@@ -99,22 +20,30 @@ struct Cli {
     raw_queries: bool,
 }
 
+const CONFIG_FILE_PATH: &str = "ts2tex.json";
+
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
-    let config_file = File::open("ts2tex.json")?;
-    let config_file_reader = BufReader::new(config_file);
-    let config: Ts2TexConfig = serde_json::from_reader(config_file_reader)?;
+    let conf = config::read("ts2tex.json")
+        .with_context(|| "Could not read configuration file")?
+        .unwrap_or_else(|| {
+            eprintln!(
+                "No configuration file was found. A new one was created at `{CONFIG_FILE_PATH}"
+            );
+            process::exit(0)
+        });
 
-    let code = fs::read_to_string(&cli.file)?;
+    let code = fs::read_to_string(&cli.file)
+        .with_context(|| format!("Could not read `{}`", cli.file.to_string_lossy()))?;
 
     if cli.raw {
         print!("{}", code.replace('{', "×{").replace('}', "×}"));
         return Ok(());
     }
 
-    let mut highlight_names = Vec::with_capacity(config.theme.len());
-    let mut highlight_styles = Vec::with_capacity(config.theme.len());
-    for (key, value) in config.theme.into_iter() {
+    let mut highlight_names = Vec::with_capacity(conf.theme.len());
+    let mut highlight_styles = Vec::with_capacity(conf.theme.len());
+    for (key, value) in conf.theme.into_iter() {
         highlight_names.push(key);
         highlight_styles.push(value);
     }
@@ -122,18 +51,26 @@ fn main() -> anyhow::Result<()> {
     let mut loader = Loader::new()?;
     loader.configure_highlights(&highlight_names);
     loader.find_all_languages(&Config {
-        parser_directories: config.parser_search_dirs,
+        parser_directories: conf.parser_search_dirs,
     })?;
 
-    let (lang, lang_config) = loader
-        .language_configuration_for_file_name(&cli.file)?
-        .unwrap();
+    let (lang, lang_config) = match loader.language_configuration_for_file_name(&cli.file)? {
+        Some(conf) => conf,
+        None => {
+            bail!(
+                "No matching tree-sitter configuration found for language in `{}`",
+                cli.file.to_string_lossy()
+            );
+        }
+    };
 
+    // TODO: is this unwrap safe?
     let parser_name = lang_config.scope.as_ref().unwrap().replace("source.", "");
+
     let mut highlights_query = String::new();
     let mut injection_query = String::new();
     let mut locals_query = String::new();
-    for glob_str in &config.query_search_dirs {
+    for glob_str in &conf.query_search_dirs {
         for dir in glob::glob(glob_str)?.filter_map(Result::ok) {
             let filetype_dir = dir.join(&parser_name);
             let highlights_file = filetype_dir.join("highlights.scm");
@@ -142,13 +79,18 @@ fn main() -> anyhow::Result<()> {
 
             // TODO: check for `; inherits: x` comments
             if highlights_file.is_file() {
-                highlights_query = fs::read_to_string(highlights_file)?;
+                highlights_query = fs::read_to_string(&highlights_file).with_context(|| {
+                    format!("Could not read {}", highlights_file.to_string_lossy())
+                })?;
             }
             if injection_file.is_file() {
-                injection_query = fs::read_to_string(injection_file)?;
+                injection_query = fs::read_to_string(&injection_file).with_context(|| {
+                    format!("Could not read {}", injection_file.to_string_lossy())
+                })?;
             }
             if locals_file.is_file() {
-                locals_query = fs::read_to_string(locals_file)?;
+                locals_query = fs::read_to_string(&locals_file)
+                    .with_context(|| format!("Could not read {}", locals_file.to_string_lossy()))?;
             }
         }
     }
@@ -253,12 +195,14 @@ fn process_queries(lang: Language, source: &str) -> anyhow::Result<String> {
                     &format!(
                         "{}{}",
                         predicate,
-                        q.split_once(predicate)
-                            .unwrap()
-                            .1
-                            .split_once(')')
-                            .unwrap()
-                            .0
+                        match q
+                            .split_once(predicate)
+                            .map(|(_, v)| v.split_once(')').map(|v| v.0))
+                        {
+                            None | Some(None) =>
+                                bail!("Invalid query: At least one query file is invalid."),
+                            Some(Some(q)) => q,
+                        }
                     ),
                     &format!(
                         "{} {}",
@@ -267,10 +211,10 @@ fn process_queries(lang: Language, source: &str) -> anyhow::Result<String> {
                     ),
                 );
             }
-            q
+            Ok(q)
         })
         .rev()
-        .collect();
+        .collect::<Result<String>>()?;
     Ok(queries)
 }
 
