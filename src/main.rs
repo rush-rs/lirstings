@@ -80,6 +80,7 @@ fn main() -> anyhow::Result<()> {
     let mut locals_query = String::new();
     for glob_str in &conf.query_search_dirs {
         for dir in glob::glob(glob_str)?.filter_map(Result::ok) {
+            #[allow(clippy::needless_borrow)] // wrongly detected
             let filetype_dir = dir.join(&parser_name);
             let highlights_file = filetype_dir.join("highlights.scm");
             let injection_file = filetype_dir.join("injections.scm");
@@ -203,14 +204,12 @@ fn process_queries(lang: Language, source: &str) -> anyhow::Result<String> {
                     &format!(
                         "{}{}",
                         predicate,
-                        match q
-                            .split_once(predicate)
-                            .map(|(_, v)| v.split_once(')').map(|v| v.0))
-                        {
-                            None | Some(None) =>
-                                bail!("Invalid query: At least one query file is invalid."),
-                            Some(Some(q)) => q,
-                        }
+                        q.split_once(predicate)
+                            .expect("replacements are correctly added above")
+                            .1
+                            .split_once(')')
+                            .expect("replacements are correctly added above")
+                            .0
                     ),
                     &format!(
                         "{} {}",
@@ -219,10 +218,10 @@ fn process_queries(lang: Language, source: &str) -> anyhow::Result<String> {
                     ),
                 );
             }
-            Ok(q)
+            q
         })
         .rev()
-        .collect::<Result<String>>()?;
+        .collect();
     Ok(queries)
 }
 
