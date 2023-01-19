@@ -13,13 +13,20 @@ mod theme;
 #[derive(clap::Parser)]
 #[clap(author, version, about)]
 struct Cli {
-    file: PathBuf,
+    #[arg(conflicts_with_all = ["code", "file_ext"], required_unless_present_all = ["code", "file_ext"])]
+    file: Option<PathBuf>,
 
     #[arg(short, long)]
     raw: bool,
 
     #[arg(long)]
     raw_queries: bool,
+
+    #[arg(long, requires = "file_ext")]
+    code: Option<String>,
+
+    #[arg(long, visible_alias = "ext", requires = "code")]
+    file_ext: Option<String>,
 }
 
 const CONFIG_FILE_PATH: &str = "ts2tex.json";
@@ -35,12 +42,14 @@ fn main() -> anyhow::Result<()> {
             process::exit(0)
         });
 
-    let code = fs::read_to_string(&cli.file).with_context(|| {
-        format!(
-            "Could not read input file at `{}`",
-            cli.file.to_string_lossy()
-        )
-    })?;
+    let code = match &cli.file {
+        Some(path) => fs::read_to_string(path).with_context(|| {
+            format!("Could not read input file at `{}`", path.to_string_lossy())
+        })?,
+        None => cli
+            .code
+            .expect("`file` can only be `None` when `code` is `Some(..)`"),
+    };
 
     if cli.raw {
         print!("{}", code.replace('{', "×{").replace('}', "×}"));
@@ -60,13 +69,17 @@ fn main() -> anyhow::Result<()> {
         parser_directories: conf.parser_search_dirs,
     })?;
 
-    let (lang, lang_config) = match loader.language_configuration_for_file_name(&cli.file)? {
+    let (lang, lang_config) = match match &cli.file {
+        Some(path) => loader.language_configuration_for_file_name(path)?,
+        None => loader.language_configuration_for_file_name(&PathBuf::from(format!(
+            "file.{}",
+            cli.file_ext
+                .expect("`file_ext` must be `Some(..)` when `file` is `None`")
+        )))?,
+    } {
         Some(conf) => conf,
         None => {
-            bail!(
-                "No matching tree-sitter configuration found for language in `{}`",
-                cli.file.to_string_lossy()
-            );
+            bail!("No matching tree-sitter configuration found");
         }
     };
 
@@ -115,6 +128,10 @@ fn main() -> anyhow::Result<()> {
         HighlightConfiguration::new(lang, &highlights_query, &injection_query, &locals_query)?;
     highlight_config.configure(&highlight_names);
 
+    if cli.file.is_none() {
+        print!("\\Verb[commandchars=×\\{{\\}}]{{");
+    }
+
     let highlights = highlighter.highlight(&highlight_config, code.as_bytes(), None, |_| None)?;
     let mut style_stack = vec![];
     for event in highlights {
@@ -131,6 +148,10 @@ fn main() -> anyhow::Result<()> {
                 ),
             },
         }
+    }
+
+    if cli.file.is_none() {
+        print!("}}");
     }
 
     Ok(())
