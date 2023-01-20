@@ -103,7 +103,7 @@ fn main() -> Result<()> {
     let mut cache = cache::read()
         .with_context(|| format!("could not read or create cache file at `{CACHE_FILE_PATH}`"))?;
 
-    let (code, line_numbers) = match &cli.subcommand {
+    let (mut code, line_numbers) = match &cli.subcommand {
         Command::FromFile {
             file,
             ranges,
@@ -140,6 +140,7 @@ fn main() -> Result<()> {
         }
         Command::Inline { code, .. } => (code.join(" "), None),
     };
+    code.truncate(code.trim_end_matches('\n').len());
 
     if matches!(&cli.subcommand, Command::FromFile { raw: true, .. }) {
         print(&code.replace('{', "×{").replace('}', "×}"));
