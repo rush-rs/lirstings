@@ -12,21 +12,20 @@ mod theme;
 
 #[derive(clap::Parser)]
 #[clap(author, version, about)]
-struct Cli {
-    #[arg(conflicts_with_all = ["code", "file_ext"], required_unless_present_all = ["code", "file_ext"])]
-    file: Option<PathBuf>,
+enum Cli {
+    FromFile {
+        file: PathBuf,
 
-    #[arg(short, long)]
-    raw: bool,
+        #[arg(short, long)]
+        raw: bool,
 
-    #[arg(long)]
-    raw_queries: bool,
-
-    #[arg(long, requires = "file_ext")]
-    code: Option<String>,
-
-    #[arg(long, visible_alias = "ext", requires = "code")]
-    file_ext: Option<String>,
+        #[arg(long)]
+        raw_queries: bool,
+    },
+    Inline {
+        file_ext: String,
+        code: Vec<String>,
+    },
 }
 
 const CONFIG_FILE_PATH: &str = "ts2tex.json";
@@ -42,16 +41,14 @@ fn main() -> anyhow::Result<()> {
             process::exit(0)
         });
 
-    let code = match &cli.file {
-        Some(path) => fs::read_to_string(path).with_context(|| {
-            format!("Could not read input file at `{}`", path.to_string_lossy())
+    let code = match &cli {
+        Cli::FromFile { file, .. } => fs::read_to_string(file).with_context(|| {
+            format!("Could not read input file at `{}`", file.to_string_lossy())
         })?,
-        None => cli
-            .code
-            .expect("`file` can only be `None` when `code` is `Some(..)`"),
+        Cli::Inline { code, .. } => code.join(" "),
     };
 
-    if cli.raw {
+    if matches!(&cli, Cli::FromFile { raw: true, .. }) {
         print!("{}", code.replace('{', "×{").replace('}', "×}"));
         return Ok(());
     }
@@ -69,13 +66,10 @@ fn main() -> anyhow::Result<()> {
         parser_directories: conf.parser_search_dirs,
     })?;
 
-    let (lang, lang_config) = match match &cli.file {
-        Some(path) => loader.language_configuration_for_file_name(path)?,
-        None => loader.language_configuration_for_file_name(&PathBuf::from(format!(
-            "file.{}",
-            cli.file_ext
-                .expect("`file_ext` must be `Some(..)` when `file` is `None`")
-        )))?,
+    let (lang, lang_config) = match match &cli {
+        Cli::FromFile { file, .. } => loader.language_configuration_for_file_name(file)?,
+        Cli::Inline { file_ext, .. } => loader
+            .language_configuration_for_file_name(&PathBuf::from(format!("file.{}", file_ext)))?,
     } {
         Some(conf) => conf,
         None => {
@@ -117,7 +111,13 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
-    if !cli.raw_queries {
+    if !matches!(
+        &cli,
+        Cli::FromFile {
+            raw_queries: true,
+            ..
+        }
+    ) {
         highlights_query = process_queries(lang, &highlights_query)?;
         injection_query = process_queries(lang, &injection_query)?;
         locals_query = process_queries(lang, &locals_query)?;
@@ -128,7 +128,7 @@ fn main() -> anyhow::Result<()> {
         HighlightConfiguration::new(lang, &highlights_query, &injection_query, &locals_query)?;
     highlight_config.configure(&highlight_names);
 
-    if cli.file.is_none() {
+    if matches!(&cli, Cli::Inline { .. }) {
         print!("\\Verb[commandchars=×\\{{\\}}]{{");
     }
 
@@ -150,7 +150,7 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
-    if cli.file.is_none() {
+    if matches!(&cli, Cli::Inline { .. }) {
         print!("}}");
     }
 
