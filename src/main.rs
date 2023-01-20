@@ -72,16 +72,20 @@ impl FromStr for Range {
             .split_once('-')
             .with_context(|| "no `-` found in range literal")?;
         let start = start
+            .trim()
             .parse::<usize>()
             .with_context(|| "failed to parse range start literal")?
             .checked_sub(1)
             .with_context(|| "line number 0 does not exist")?;
         let end = end
+            .trim()
             .parse::<usize>()
             .with_context(|| "failed to parse range end literal")?
             .checked_sub(1)
             .with_context(|| "line number 0 does not exist")?;
-        // TODO: validate end >= start
+        if start > end {
+            bail!("range start is higher than range end");
+        }
         Ok(Self { start, end })
     }
 }
