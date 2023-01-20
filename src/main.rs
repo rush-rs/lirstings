@@ -20,6 +20,7 @@ use config::CONFIG_FILE_PATH;
 
 use crate::output::Output;
 
+mod ansi;
 mod cache;
 mod config;
 mod output;
@@ -37,7 +38,8 @@ pub struct Cli {
 
 #[derive(Subcommand, Hash)]
 pub enum Command {
-    FromFile {
+    #[command(visible_alias = "ts")]
+    TreeSitter {
         file: PathBuf,
 
         #[arg(short, long)]
@@ -55,6 +57,9 @@ pub enum Command {
     Inline {
         file_ext: String,
         code: Vec<String>,
+    },
+    Ansi {
+        file: PathBuf,
     },
 }
 
@@ -104,13 +109,14 @@ fn main() -> Result<()> {
         .with_context(|| format!("could not read or create cache file at `{CACHE_FILE_PATH}`"))?;
 
     let (mut code, line_numbers) = match &cli.subcommand {
-        Command::FromFile {
+        Command::TreeSitter {
             file,
             ranges,
             gobble,
             ..
         } if ranges.is_empty() => (read_file_and_gobble(file, *gobble)?, None),
-        Command::FromFile {
+        Command::Ansi { file } => (read_file_and_gobble(file, 0)?, None),
+        Command::TreeSitter {
             file,
             ranges,
             gobble,
@@ -142,7 +148,7 @@ fn main() -> Result<()> {
     };
     code.truncate(code.trim_end_matches('\n').len());
 
-    if matches!(&cli.subcommand, Command::FromFile { raw: true, .. }) {
+    if matches!(&cli.subcommand, Command::TreeSitter { raw: true, .. }) {
         print(&code.replace('{', "×{").replace('}', "×}"));
         return Ok(());
     }
@@ -161,9 +167,13 @@ fn main() -> Result<()> {
     })?;
 
     let (lang, lang_config) = match match &cli.subcommand {
-        Command::FromFile { file, .. } => loader.language_configuration_for_file_name(file)?,
+        Command::TreeSitter { file, .. } => loader.language_configuration_for_file_name(file)?,
         Command::Inline { file_ext, .. } => loader
             .language_configuration_for_file_name(&PathBuf::from(format!("file.{}", file_ext)))?,
+        Command::Ansi { .. } => {
+            print(&ansi::parse(code, &cli.fancyvrb_args));
+            return Ok(());
+        }
     } {
         Some(conf) => conf,
         None => {
@@ -221,7 +231,7 @@ fn main() -> Result<()> {
 
     if !matches!(
         &cli.subcommand,
-        Command::FromFile {
+        Command::TreeSitter {
             raw_queries: true,
             ..
         }
