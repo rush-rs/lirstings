@@ -9,7 +9,7 @@ use std::{
 };
 
 use anyhow::{bail, Context, Result};
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use tree_sitter::{Language, Query, QueryPredicateArg};
 use tree_sitter_highlight::{Highlight, HighlightConfiguration, HighlightEvent, Highlighter};
 use tree_sitter_loader::{Config, Loader};
@@ -24,9 +24,18 @@ mod config;
 mod output;
 mod theme;
 
-#[derive(clap::Parser, Hash)]
-#[clap(author, version, about)]
-pub(crate) enum Cli {
+#[derive(Parser, Hash)]
+#[command(author, version, about)]
+pub struct Cli {
+    #[arg(long, global = true, default_value = "")]
+    fancyvrb_args: String,
+
+    #[command(subcommand)]
+    subcommand: Command,
+}
+
+#[derive(Subcommand, Hash)]
+pub enum Command {
     FromFile {
         file: PathBuf,
 
@@ -46,7 +55,7 @@ pub(crate) enum Cli {
 }
 
 #[derive(Debug, Clone, Copy, Hash)]
-struct Range {
+pub struct Range {
     start: usize,
     end: usize,
 }
@@ -75,7 +84,6 @@ impl FromStr for Range {
 
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
-    let inline = matches!(&cli, Cli::Inline { .. });
 
     let conf = config::read()
         .with_context(|| format!("could not read or create config file at `{CONFIG_FILE_PATH}`"))?
@@ -87,14 +95,14 @@ fn main() -> anyhow::Result<()> {
     let mut cache = cache::read()
         .with_context(|| format!("could not read or create cache file at `{CACHE_FILE_PATH}`"))?;
 
-    let (code, line_numbers) = match &cli {
-        Cli::FromFile { file, ranges, .. } if ranges.is_empty() => (
+    let (code, line_numbers) = match &cli.subcommand {
+        Command::FromFile { file, ranges, .. } if ranges.is_empty() => (
             fs::read_to_string(file).with_context(|| {
                 format!("Could not read input file at `{}`", file.to_string_lossy())
             })?,
             None,
         ),
-        Cli::FromFile { file, ranges, .. } => {
+        Command::FromFile { file, ranges, .. } => {
             let raw = fs::read_to_string(file).with_context(|| {
                 format!("Could not read input file at `{}`", file.to_string_lossy())
             })?;
@@ -119,10 +127,10 @@ fn main() -> anyhow::Result<()> {
             }
             (code, Some(line_numbers))
         }
-        Cli::Inline { code, .. } => (code.join(" "), None),
+        Command::Inline { code, .. } => (code.join(" "), None),
     };
 
-    if matches!(&cli, Cli::FromFile { raw: true, .. }) {
+    if matches!(&cli.subcommand, Command::FromFile { raw: true, .. }) {
         print(&code.replace('{', "×{").replace('}', "×}"));
         return Ok(());
     }
@@ -140,9 +148,9 @@ fn main() -> anyhow::Result<()> {
         parser_directories: conf.parser_search_dirs,
     })?;
 
-    let (lang, lang_config) = match match &cli {
-        Cli::FromFile { file, .. } => loader.language_configuration_for_file_name(file)?,
-        Cli::Inline { file_ext, .. } => loader
+    let (lang, lang_config) = match match &cli.subcommand {
+        Command::FromFile { file, .. } => loader.language_configuration_for_file_name(file)?,
+        Command::Inline { file_ext, .. } => loader
             .language_configuration_for_file_name(&PathBuf::from(format!("file.{}", file_ext)))?,
     } {
         Some(conf) => conf,
@@ -193,14 +201,15 @@ fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
+    let inline = matches!(&cli.subcommand, Command::Inline { .. });
     let mut output = match line_numbers {
-        Some(numbers) => Output::new(numbers.into_iter().flatten(), inline),
-        None => Output::new(1.., inline),
+        Some(numbers) => Output::new(numbers.into_iter().flatten(), inline, &cli.fancyvrb_args),
+        None => Output::new(1.., inline, &cli.fancyvrb_args),
     };
 
     if !matches!(
-        &cli,
-        Cli::FromFile {
+        &cli.subcommand,
+        Command::FromFile {
             raw_queries: true,
             ..
         }
@@ -214,10 +223,6 @@ fn main() -> anyhow::Result<()> {
     let mut highlight_config =
         HighlightConfiguration::new(lang, &highlights_query, &injection_query, &locals_query)?;
     highlight_config.configure(&highlight_names);
-
-    if inline {
-        output.push_str("\\Verb[commandchars=×\\{\\}]{");
-    }
 
     let highlights = highlighter.highlight(&highlight_config, code.as_bytes(), None, |_| None)?;
     let mut style_stack = vec![];
@@ -234,10 +239,6 @@ fn main() -> anyhow::Result<()> {
                 None => output.push_str(&code[start..end].replace('{', "×{").replace('}', "×}")),
             },
         }
-    }
-
-    if inline {
-        output.push('}');
     }
 
     let output = output.finish();

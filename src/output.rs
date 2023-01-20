@@ -7,13 +7,17 @@ pub struct Output {
 const SET_COUNTER_COMMAND: &str = "×setcounter{TS2TeXLineNo}";
 
 impl Output {
-    pub fn new(mut line_numbers: impl Iterator<Item = usize> + 'static, inline: bool) -> Self {
+    pub fn new(
+        mut line_numbers: impl Iterator<Item = usize> + 'static,
+        inline: bool,
+        extra_args: &str,
+    ) -> Self {
         let first_number = line_numbers.next().unwrap_or_default();
         Self {
             line_numbers: Box::new(line_numbers),
             output_string: match inline {
-                true => String::new(),
-                false => format!("{SET_COUNTER_COMMAND}{{{first_number}}}"),
+                true => "\\Verb[commandchars=×\\{\\}]{".to_string(),
+                false => format!("\\begin{{Verbatim}}[commandchars=×\\{{\\}},{extra_args}]\n{SET_COUNTER_COMMAND}{{{first_number}}}"),
             },
             inline,
         }
@@ -34,17 +38,11 @@ impl Output {
         }
     }
 
-    pub fn push(&mut self, char: char) {
-        self.output_string.push(char);
-        if char == '\n' && !self.inline {
-            self.output_string.push_str(&format!(
-                "{SET_COUNTER_COMMAND}{{{}}}",
-                self.line_numbers.next().unwrap_or_default()
-            ));
+    pub fn finish(mut self) -> String {
+        match self.inline {
+            true => self.output_string.push('}'),
+            false => self.output_string.push_str("\n\\end{Verbatim}"),
         }
-    }
-
-    pub fn finish(self) -> String {
         self.output_string
     }
 }
