@@ -3,7 +3,8 @@ use std::{
     collections::HashMap,
     fs,
     io::{self, Write},
-    path::PathBuf,
+    iter,
+    path::{Path, PathBuf},
     process,
     str::FromStr,
 };
@@ -27,7 +28,7 @@ mod theme;
 #[derive(Parser, Hash)]
 #[command(author, version, about)]
 pub struct Cli {
-    #[arg(long, global = true, default_value = "")]
+    #[arg(short = 'x', long, global = true, default_value = "")]
     fancyvrb_args: String,
 
     #[command(subcommand)]
@@ -47,6 +48,9 @@ pub enum Command {
 
         #[arg(short = 'R', long, value_delimiter = ',')]
         ranges: Vec<Range>,
+
+        #[arg(short, long, default_value = "0")]
+        gobble: usize,
     },
     Inline {
         file_ext: String,
@@ -82,7 +86,7 @@ impl FromStr for Range {
     }
 }
 
-fn main() -> anyhow::Result<()> {
+fn main() -> Result<()> {
     let cli = Cli::parse();
 
     let conf = config::read()
@@ -96,16 +100,19 @@ fn main() -> anyhow::Result<()> {
         .with_context(|| format!("could not read or create cache file at `{CACHE_FILE_PATH}`"))?;
 
     let (code, line_numbers) = match &cli.subcommand {
-        Command::FromFile { file, ranges, .. } if ranges.is_empty() => (
-            fs::read_to_string(file).with_context(|| {
-                format!("Could not read input file at `{}`", file.to_string_lossy())
-            })?,
-            None,
-        ),
-        Command::FromFile { file, ranges, .. } => {
-            let raw = fs::read_to_string(file).with_context(|| {
-                format!("Could not read input file at `{}`", file.to_string_lossy())
-            })?;
+        Command::FromFile {
+            file,
+            ranges,
+            gobble,
+            ..
+        } if ranges.is_empty() => (read_file_and_gobble(file, *gobble)?, None),
+        Command::FromFile {
+            file,
+            ranges,
+            gobble,
+            ..
+        } => {
+            let raw = read_file_and_gobble(file, *gobble)?;
             let lines: Vec<_> = raw.lines().collect();
             let mut code = String::new();
             let mut line_numbers = vec![];
@@ -255,6 +262,18 @@ fn main() -> anyhow::Result<()> {
 fn print(input: &str) {
     let mut stdout = io::stdout().lock();
     _ = stdout.write_all(input.as_bytes());
+}
+
+fn read_file_and_gobble(path: &Path, gobble: usize) -> Result<String> {
+    let raw_code = fs::read_to_string(path)
+        .with_context(|| format!("Could not read input file at `{}`", path.to_string_lossy()))?;
+    if gobble > 0 {
+        return Ok(raw_code
+            .lines()
+            .flat_map(|line| line.chars().skip(gobble).chain(iter::once('\n')))
+            .collect::<String>());
+    }
+    Ok(raw_code)
 }
 
 fn process_queries(lang: Language, source: &str) -> anyhow::Result<String> {
