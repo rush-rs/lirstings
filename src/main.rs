@@ -1,5 +1,5 @@
 // TODO: write README.md
-use std::{collections::HashMap, fs, path::PathBuf, process};
+use std::{collections::HashMap, fs, path::PathBuf, process, str::FromStr};
 
 use anyhow::{bail, Context, Result};
 use clap::Parser;
@@ -21,6 +21,9 @@ enum Cli {
 
         #[arg(long)]
         raw_queries: bool,
+
+        #[arg(short = 'R', long, value_delimiter = ',')]
+        ranges: Vec<Range>,
     },
     Inline {
         file_ext: String,
@@ -29,6 +32,34 @@ enum Cli {
 }
 
 const CONFIG_FILE_PATH: &str = "ts2tex.json";
+
+#[derive(Debug, Clone, Copy)]
+struct Range {
+    start: usize,
+    end: usize,
+}
+
+impl FromStr for Range {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (start, end) = s
+            .split_once('-')
+            .with_context(|| "no `-` found in range literal")?;
+        let start = start
+            .parse::<usize>()
+            .with_context(|| "failed to parse range start literal")?
+            .checked_sub(1)
+            .with_context(|| "line number 0 does not exist")?;
+        let end = end
+            .parse::<usize>()
+            .with_context(|| "failed to parse range end literal")?
+            .checked_sub(1)
+            .with_context(|| "line number 0 does not exist")?;
+        // TODO: validate end >= start
+        Ok(Self { start, end })
+    }
+}
 
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
@@ -42,9 +73,32 @@ fn main() -> anyhow::Result<()> {
         });
 
     let code = match &cli {
-        Cli::FromFile { file, .. } => fs::read_to_string(file).with_context(|| {
-            format!("Could not read input file at `{}`", file.to_string_lossy())
-        })?,
+        Cli::FromFile { file, ranges, .. } if ranges.is_empty() => fs::read_to_string(file)
+            .with_context(|| {
+                format!("Could not read input file at `{}`", file.to_string_lossy())
+            })?,
+        Cli::FromFile { file, ranges, .. } => {
+            let raw = fs::read_to_string(file).with_context(|| {
+                format!("Could not read input file at `{}`", file.to_string_lossy())
+            })?;
+            let lines: Vec<_> = raw.lines().collect();
+            let mut code = String::new();
+            for (index, range) in ranges.iter().enumerate() {
+                if index != 0 {
+                    let indent = lines[range.start]
+                        .chars()
+                        .take_while(|char| *char == ' ')
+                        .count();
+                    code += &format!("{}// ...\n", " ".repeat(indent));
+                }
+                code += &lines
+                    .get(range.start..=range.end)
+                    .with_context(|| "range out of bounds for input file")?
+                    .join("\n");
+                code += "\n";
+            }
+            code
+        }
         Cli::Inline { code, .. } => code.join(" "),
     };
 
