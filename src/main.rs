@@ -4,7 +4,8 @@ use std::{
     fs,
     io::{self, Write},
     path::PathBuf,
-    process, str::FromStr,
+    process,
+    str::FromStr,
 };
 
 use anyhow::{bail, Context, Result};
@@ -16,8 +17,11 @@ use tree_sitter_loader::{Config, Loader};
 use cache::CACHE_FILE_PATH;
 use config::CONFIG_FILE_PATH;
 
+use crate::output::Output;
+
 mod cache;
 mod config;
+mod output;
 mod theme;
 
 #[derive(clap::Parser, Hash)]
@@ -47,7 +51,6 @@ struct Range {
     end: usize,
 }
 
-
 impl FromStr for Range {
     type Err = anyhow::Error;
 
@@ -72,6 +75,7 @@ impl FromStr for Range {
 
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
+    let inline = matches!(&cli, Cli::Inline { .. });
 
     let conf = config::read()
         .with_context(|| format!("could not read or create config file at `{CONFIG_FILE_PATH}`"))?
@@ -83,17 +87,20 @@ fn main() -> anyhow::Result<()> {
     let mut cache = cache::read()
         .with_context(|| format!("could not read or create cache file at `{CACHE_FILE_PATH}`"))?;
 
-    let code = match &cli {
-        Cli::FromFile { file, ranges, .. } if ranges.is_empty() => fs::read_to_string(file)
-            .with_context(|| {
+    let (code, line_numbers) = match &cli {
+        Cli::FromFile { file, ranges, .. } if ranges.is_empty() => (
+            fs::read_to_string(file).with_context(|| {
                 format!("Could not read input file at `{}`", file.to_string_lossy())
             })?,
+            None,
+        ),
         Cli::FromFile { file, ranges, .. } => {
             let raw = fs::read_to_string(file).with_context(|| {
                 format!("Could not read input file at `{}`", file.to_string_lossy())
             })?;
             let lines: Vec<_> = raw.lines().collect();
             let mut code = String::new();
+            let mut line_numbers = vec![];
             for (index, range) in ranges.iter().enumerate() {
                 if index != 0 {
                     let indent = lines[range.start]
@@ -101,16 +108,18 @@ fn main() -> anyhow::Result<()> {
                         .take_while(|char| *char == ' ')
                         .count();
                     code += &format!("{}// ...\n", " ".repeat(indent));
+                    line_numbers.push(0..=0);
                 }
                 code += &lines
                     .get(range.start..=range.end)
                     .with_context(|| "range out of bounds for input file")?
                     .join("\n");
                 code += "\n";
+                line_numbers.push(range.start..=range.end);
             }
-            code
+            (code, Some(line_numbers))
         }
-        Cli::Inline { code, .. } => code.join(" "),
+        Cli::Inline { code, .. } => (code.join(" "), None),
     };
 
     if matches!(&cli, Cli::FromFile { raw: true, .. }) {
@@ -184,7 +193,10 @@ fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let mut output = String::new();
+    let mut output = match line_numbers {
+        Some(numbers) => Output::new(numbers.into_iter().flatten(), inline),
+        None => Output::new(1.., inline),
+    };
 
     if !matches!(
         &cli,
@@ -203,7 +215,7 @@ fn main() -> anyhow::Result<()> {
         HighlightConfiguration::new(lang, &highlights_query, &injection_query, &locals_query)?;
     highlight_config.configure(&highlight_names);
 
-    if matches!(&cli, Cli::Inline { .. }) {
+    if inline {
         output.push_str("\\Verb[commandchars=×\\{\\}]{");
     }
 
@@ -224,10 +236,11 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
-    if matches!(&cli, Cli::Inline { .. }) {
+    if inline {
         output.push('}');
     }
 
+    let output = output.finish();
     print(&output);
     eprintln!("ts2tex: written to cache");
     cache
