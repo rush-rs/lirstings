@@ -13,17 +13,17 @@ use std::collections::hash_map::DefaultHasher;
 use crate::Cli;
 pub(crate) const CACHE_FILE_PATH: &str = "ts2tex.cache.json";
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Default)]
 pub struct Cache(HashMap<u64, String>);
 
-impl Default for Cache {
-    fn default() -> Self {
-        Self(HashMap::new())
-    }
-}
-
 impl Cache {
-    pub(crate) fn set_entry(&mut self, args: &Cli, code: &str, queries: &str, output: String) -> Result<()> {
+    pub(crate) fn set_entry(
+        &mut self,
+        args: &Cli,
+        code: &str,
+        queries: &str,
+        output: String,
+    ) -> Result<()> {
         let key_hash = hash((args, code, queries));
         self.0.insert(key_hash, output);
 
