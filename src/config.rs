@@ -5,24 +5,26 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::Result;
-
 use crate::theme::ThemeValue;
+use anyhow::Result;
+use serde::Deserialize;
 
-#[derive(serde::Deserialize)]
+pub(crate) const CONFIG_FILE_PATH: &str = "ts2tex.json";
+
+#[derive(Deserialize)]
 pub struct Config {
     pub theme: HashMap<String, ThemeValue>,
     pub query_search_dirs: Vec<String>,
     pub parser_search_dirs: Vec<PathBuf>,
 }
 
-pub fn read(file_path: &str) -> Result<Option<Config>> {
+pub fn read() -> Result<Option<Config>> {
     // either read or create a configuration file based on it's current existence
-    let path = Path::new(file_path);
+    let path = Path::new(CONFIG_FILE_PATH);
     match &path.exists() {
         true => {
             // the file exists, it can be read
-            let config_file = File::open(file_path)?;
+            let config_file = File::open(CONFIG_FILE_PATH)?;
             let config_file_reader = BufReader::new(config_file);
             let config: Config = serde_json::from_reader(config_file_reader)?;
             Ok(Some(config))

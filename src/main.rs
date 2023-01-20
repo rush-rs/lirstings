@@ -1,5 +1,11 @@
 // TODO: write README.md
-use std::{collections::HashMap, fs, path::PathBuf, process, str::FromStr};
+use std::{
+    collections::HashMap,
+    fs,
+    io::{self, Write},
+    path::PathBuf,
+    process, str::FromStr,
+};
 
 use anyhow::{bail, Context, Result};
 use clap::Parser;
@@ -7,12 +13,16 @@ use tree_sitter::{Language, Query, QueryPredicateArg};
 use tree_sitter_highlight::{Highlight, HighlightConfiguration, HighlightEvent, Highlighter};
 use tree_sitter_loader::{Config, Loader};
 
+use cache::CACHE_FILE_PATH;
+use config::CONFIG_FILE_PATH;
+
+mod cache;
 mod config;
 mod theme;
 
-#[derive(clap::Parser)]
+#[derive(clap::Parser, Hash)]
 #[clap(author, version, about)]
-enum Cli {
+pub(crate) enum Cli {
     FromFile {
         file: PathBuf,
 
@@ -31,13 +41,12 @@ enum Cli {
     },
 }
 
-const CONFIG_FILE_PATH: &str = "ts2tex.json";
-
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Hash)]
 struct Range {
     start: usize,
     end: usize,
 }
+
 
 impl FromStr for Range {
     type Err = anyhow::Error;
@@ -63,14 +72,16 @@ impl FromStr for Range {
 
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
-    let conf = config::read("ts2tex.json")
-        .with_context(|| "Could not read configuration file")?
+
+    let conf = config::read()
+        .with_context(|| format!("could not read or create config file at `{CONFIG_FILE_PATH}`"))?
         .unwrap_or_else(|| {
-            eprintln!(
-                "No configuration file was found. A new one was created at `{CONFIG_FILE_PATH}"
-            );
-            process::exit(0)
+            eprintln!("New configuration file was created at `{CONFIG_FILE_PATH}`");
+            process::exit(200)
         });
+
+    let mut cache = cache::read()
+        .with_context(|| format!("could not read or create cache file at `{CACHE_FILE_PATH}`"))?;
 
     let code = match &cli {
         Cli::FromFile { file, ranges, .. } if ranges.is_empty() => fs::read_to_string(file)
@@ -103,7 +114,7 @@ fn main() -> anyhow::Result<()> {
     };
 
     if matches!(&cli, Cli::FromFile { raw: true, .. }) {
-        print!("{}", code.replace('{', "×{").replace('}', "×}"));
+        print(&code.replace('{', "×{").replace('}', "×}"));
         return Ok(());
     }
 
@@ -165,6 +176,16 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
+    let hash_query = highlights_query.to_string() + &injection_query + &locals_query;
+
+    if let Some(cached) = cache.get_cached(&cli, &code, &hash_query) {
+        eprintln!("ts2tex: skipping generation of cached input");
+        print(&cached);
+        return Ok(());
+    }
+
+    let mut output = String::new();
+
     if !matches!(
         &cli,
         Cli::FromFile {
@@ -183,7 +204,7 @@ fn main() -> anyhow::Result<()> {
     highlight_config.configure(&highlight_names);
 
     if matches!(&cli, Cli::Inline { .. }) {
-        print!("\\Verb[commandchars=×\\{{\\}}]{{");
+        output.push_str("\\Verb[commandchars=×\\{\\}]{");
     }
 
     let highlights = highlighter.highlight(&highlight_config, code.as_bytes(), None, |_| None)?;
@@ -195,20 +216,31 @@ fn main() -> anyhow::Result<()> {
                 style_stack.pop();
             }
             HighlightEvent::Source { start, end } => match style_stack.last() {
-                Some(highlight) => highlight_styles[*highlight].write(&code[start..end]),
-                None => print!(
-                    "{}",
-                    &code[start..end].replace('{', "×{").replace('}', "×}"),
-                ),
+                Some(highlight) => {
+                    output.push_str(&highlight_styles[*highlight].write(&code[start..end]))
+                }
+                None => output.push_str(&code[start..end].replace('{', "×{").replace('}', "×}")),
             },
         }
     }
 
     if matches!(&cli, Cli::Inline { .. }) {
-        print!("}}");
+        output.push('}');
     }
 
+    print(&output);
+    eprintln!("ts2tex: written to cache");
+    cache
+        .set_entry(&cli, &code, &hash_query, output)
+        .with_context(|| "could not update cache file")?;
+
     Ok(())
+}
+
+#[inline]
+fn print(input: &str) {
+    let mut stdout = io::stdout().lock();
+    _ = stdout.write_all(input.as_bytes());
 }
 
 fn process_queries(lang: Language, source: &str) -> anyhow::Result<String> {

@@ -1,4 +1,6 @@
-#[derive(serde::Deserialize)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum ThemeValue {
     Color(String),
@@ -16,7 +18,7 @@ pub enum ThemeValue {
 }
 
 impl ThemeValue {
-    pub fn write(&self, text: &str) {
+    pub fn write(&self, text: &str) -> String {
         let text = text.replace('{', "×{").replace('}', "×}");
         let lines: Vec<_> = text
             .lines()
@@ -65,6 +67,7 @@ impl ThemeValue {
                 out
             })
             .collect();
-        print!("{}", lines.join("\n"));
+        lines.join("\n")
+        // print!("{}", lines.join("\n"));
     }
 }
