@@ -156,7 +156,7 @@ fn main() -> Result<()> {
                 print(cached);
                 return Ok(());
             }
-            (ansi::highlight(code, &cli.fancyvrb_args), hash)
+            (ansi::highlight(code, &cli.fancyvrb_args, &config.ansi_colors), hash)
         }
         Command::TreeSitter { .. } | Command::Inline { .. } => {
             let settings = ts::get_settings(config, &cli.subcommand)?;

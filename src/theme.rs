@@ -68,6 +68,5 @@ impl ThemeValue {
             })
             .collect();
         lines.join("\n")
-        // print!("{}", lines.join("\n"));
     }
 }
