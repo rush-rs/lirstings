@@ -58,6 +58,8 @@ pub enum Command {
     Ansi {
         file: PathBuf,
     },
+    #[command(visible_aliases = ["tex", "include", "include-tex"])]
+    TexInclude,
 }
 
 #[derive(Debug, Clone, Copy, Hash)]
@@ -106,6 +108,10 @@ fn main() -> Result<()> {
         .with_context(|| format!("could not read or create cache file at `{CACHE_FILE_PATH}`"))?;
 
     let (mut code, line_numbers) = match &cli.subcommand {
+        Command::TexInclude => {
+            print(include_str!("./lirstings.tex"));
+            return Ok(());
+        }
         Command::TreeSitter {
             file,
             ranges,
@@ -146,6 +152,7 @@ fn main() -> Result<()> {
     code.truncate(code.trim_end_matches('\n').len());
 
     let (output, hash) = match &cli.subcommand {
+        Command::TexInclude => unreachable!("`tex-include` subcommand immediately returns"),
         Command::Ansi { .. } => {
             let hash = cache::hash((&cli, &code, None::<String>));
             if let Some(cached) = cache.get_cached(hash) {

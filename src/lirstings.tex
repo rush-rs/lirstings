@@ -1,0 +1,98 @@
+\usepackage{keycommand}
+\usepackage{fvextra}
+\usepackage{float}
+\usepackage[labelformat=simple]{caption}
+\usepackage[normalem]{ulem}
+
+\captionsetup{margin=10pt, font=small, labelfont=bf, labelsep=endash}
+
+% TODO: allow configuration
+\definecolor{hint}{HTML}{A0A1A7}
+\fvset{
+    breaklines=true,
+    numbers=left,
+    frame=lines,
+    numbersep=12pt,
+    rulecolor=\color{hint},
+    framesep=2\fboxsep,
+    labelposition=bottomline,
+    % baselinestretch=1,
+}
+\newcounter{LirstingsLineNo}
+\renewcommand{\theFancyVerbLine}{\ifnum\value{LirstingsLineNo}=0\else\footnotesize\ttfamily\color{hint}\arabic{LirstingsLineNo}\fi}
+
+\newfloat{listing}{htbp}{lol}[chapter]
+\floatname{listing}{Listing}
+% sets for all custom floats with `plain` style
+\captionsetup[plain]{skip=0pt}
+
+\newcommand{\LirstInline}[2]{\ignorespaces\directlua{
+    local escaped = string.gsub([[#2]], "'", [['"'"']])
+    local handle, err = io.popen("lirstings inline '#1' '" .. escaped .. "'")
+
+    if not handle then
+        print(err)
+        os.exit(1)
+    end
+    tex.print(handle:read('*all'))
+    handle:close()
+}\unskip}
+
+\newkeycommand+[°]{\Lirsting}[
+    ranges,
+    caption,
+    label,
+    float,
+    bool ansi=false,
+    bool raw=false,
+    bool raw queries=false,
+    gobble,
+    fancyvrb,
+][1]{
+    °\def\args{}°
+    °\def\commandargs{}°
+%
+    % set `label` if `caption` is set and `float` is unset
+    \ifcommandkey{caption}{
+        \ifcommandkey{float}{}{
+            °\expandafter\def\expandafter\args\expandafter{\args%
+                label=\textnormal{\color{black}\commandkey{caption}},
+            }°
+        }
+    }{}
+    % set `--raw` flag if `raw` is true
+    \if\commandkey{raw}1°\expandafter\def\expandafter\commandargs\expandafter{\commandargs%
+        --raw
+    }°\fi
+    % set `--raw-queries` flag if `raw queries` is true
+    \if\commandkey{raw queries}1°\expandafter\def\expandafter\commandargs\expandafter{\commandargs%
+        --raw-queries
+    }°\fi
+    % set `--ranges` flag if `ranges` is set
+    \ifcommandkey{ranges}{°\expandafter\def\expandafter\commandargs\expandafter{\commandargs%
+        --ranges '\commandkey{ranges}'
+    }°}{}
+    % set `--gobble` flag if `gobble` is set
+    \ifcommandkey{gobble}{°\expandafter\def\expandafter\commandargs\expandafter{\commandargs%
+        --gobble '\commandkey{gobble}'
+    }°}{}
+    % set `--fancyvrb-args` flag
+    °\expandafter\def\expandafter\commandargs\expandafter{\commandargs%
+        --fancyvrb-args '\args\commandkey{fancyvrb}'
+    }°
+%
+    % begin float if `float` is set
+    \ifcommandkey{float}{°\begin{listing}°[\commandkey{float}]}{}
+    % actual input of code
+    \if\commandkey{ansi}1%
+        °\input°{|"lirstings ansi #1 °\commandargs°"}%
+    \else%
+        °\input°{|"lirstings tree-sitter #1 °\commandargs°"}%
+    \fi
+    % end float and set caption and label if `float` is set
+    \ifcommandkey{float}{
+            \ifcommandkey{caption}{°\caption{\commandkey{caption}}°}{}
+            \ifcommandkey{label}{°\label{\commandkey{label}}°}{}
+        °\end{listing}°
+    }{}
+}
