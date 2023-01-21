@@ -180,6 +180,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "lirstings"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "glob",
+ "serde",
+ "serde_json",
+ "tree-sitter",
+ "tree-sitter-highlight",
+ "tree-sitter-loader",
+ "tree-sitter-rust",
+]
+
+[[package]]
 name = "memchr"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -420,21 +435,6 @@ dependencies = [
  "regex",
  "thiserror",
  "tree-sitter",
-]
-
-[[package]]
-name = "ts2tex"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "glob",
- "serde",
- "serde_json",
- "tree-sitter",
- "tree-sitter-highlight",
- "tree-sitter-loader",
- "tree-sitter-rust",
 ]
 
 [[package]]

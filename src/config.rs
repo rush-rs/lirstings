@@ -9,7 +9,7 @@ use crate::theme::ThemeValue;
 use anyhow::Result;
 use serde::Deserialize;
 
-pub const CONFIG_FILE_PATH: &str = "ts2tex.json";
+pub const CONFIG_FILE_PATH: &str = "lirstings.json";
 
 #[derive(Deserialize)]
 pub struct Config {

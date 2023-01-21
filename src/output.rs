@@ -4,7 +4,7 @@ pub struct Output {
     inline: bool,
 }
 
-const SET_COUNTER_COMMAND: &str = "×setcounter{TS2TeXLineNo}";
+const SET_COUNTER_COMMAND: &str = "×setcounter{LirstingsLineNo}";
 
 impl Output {
     pub fn new(

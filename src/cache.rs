@@ -10,9 +10,9 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
 
-pub const CACHE_FILE_PATH: &str = "ts2tex.cache.json";
-pub const CACHE_SKIP_MESSAGE: &str = "ts2tex: skipping generation of cached input";
-pub const CACHE_WRITE_MESSAGE: &str = "ts2tex: written to cache";
+pub const CACHE_FILE_PATH: &str = "lirstings.cache.json";
+pub const CACHE_SKIP_MESSAGE: &str = "lirstings: skipping generation of cached input";
+pub const CACHE_WRITE_MESSAGE: &str = "lirstings: written to cache";
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct Cache(HashMap<u64, String>);
