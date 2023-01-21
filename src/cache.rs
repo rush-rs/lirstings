@@ -10,22 +10,16 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
 
-use crate::Cli;
-pub(crate) const CACHE_FILE_PATH: &str = "ts2tex.cache.json";
+pub const CACHE_FILE_PATH: &str = "ts2tex.cache.json";
+pub const CACHE_SKIP_MESSAGE: &str = "ts2tex: skipping generation of cached input";
+pub const CACHE_WRITE_MESSAGE: &str = "ts2tex: written to cache";
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct Cache(HashMap<u64, String>);
 
 impl Cache {
-    pub(crate) fn set_entry(
-        &mut self,
-        args: &Cli,
-        code: &str,
-        queries: &str,
-        output: String,
-    ) -> Result<()> {
-        let key_hash = hash((args, code, queries));
-        self.0.insert(key_hash, output);
+    pub fn set_entry(&mut self, hash: u64, output: String) -> Result<()> {
+        self.0.insert(hash, output);
 
         let repr = serde_json::to_vec(self).with_context(|| "could not marshal cache struct")?;
         fs::write(CACHE_FILE_PATH, repr).with_context(|| "could not write to cache file")?;
@@ -33,13 +27,12 @@ impl Cache {
         Ok(())
     }
 
-    pub(crate) fn get_cached(&self, args: &Cli, code: &str, queries: &str) -> Option<String> {
-        let key_hash = hash((args, code, queries));
-        self.0.get(&key_hash).cloned()
+    pub fn get_cached(&self, hash: u64) -> Option<&str> {
+        self.0.get(&hash).map(|string| string.as_str())
     }
 }
 
-fn hash<T>(obj: T) -> u64
+pub fn hash<T>(obj: T) -> u64
 where
     T: Hash,
 {

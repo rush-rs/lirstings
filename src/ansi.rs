@@ -44,7 +44,7 @@ enum Color {
     Rgb(u8, u8, u8),
 }
 
-pub fn parse(input: String, extra_args: &str) -> String {
+pub fn highlight(input: String, extra_args: &str) -> String {
     let mut out =
         format!("\\begin{{Verbatim}}[commandchars=×\\{{\\}},numbers=none,{extra_args}]\n");
     let mut split = input.split('\x1b');
