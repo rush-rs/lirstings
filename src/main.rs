@@ -14,6 +14,8 @@ use clap::{Parser, Subcommand};
 use cache::{CACHE_FILE_PATH, CACHE_SKIP_MESSAGE, CACHE_WRITE_MESSAGE};
 use config::CONFIG_FILE_PATH;
 
+use crate::output::Output;
+
 mod ansi;
 mod cache;
 mod config;
@@ -143,11 +145,6 @@ fn main() -> Result<()> {
     };
     code.truncate(code.trim_end_matches('\n').len());
 
-    if matches!(&cli.subcommand, Command::TreeSitter { raw: true, .. }) {
-        print(&code.replace('{', "×{").replace('}', "×}"));
-        return Ok(());
-    }
-
     let (output, hash) = match &cli.subcommand {
         Command::Ansi { .. } => {
             let hash = cache::hash((&cli, &code, None::<String>));
@@ -156,7 +153,26 @@ fn main() -> Result<()> {
                 print(cached);
                 return Ok(());
             }
-            (ansi::highlight(code, &cli.fancyvrb_args, &config.ansi_colors), hash)
+            (
+                ansi::highlight(code, &cli.fancyvrb_args, &config.ansi_colors),
+                hash,
+            )
+        }
+        Command::TreeSitter { raw: true, .. } => {
+            let hash = cache::hash((&cli, &code, None::<String>));
+            if let Some(cached) = cache.get_cached(hash) {
+                eprintln!("{CACHE_SKIP_MESSAGE}");
+                print(cached);
+                return Ok(());
+            }
+            let mut output = match line_numbers {
+                Some(numbers) => {
+                    Output::new(numbers.into_iter().flatten(), false, &cli.fancyvrb_args)
+                }
+                None => Output::new(1.., false, &cli.fancyvrb_args),
+            };
+            output.push_str(&code.replace('{', "×{").replace('}', "×}"));
+            (output.finish(), hash)
         }
         Command::TreeSitter { .. } | Command::Inline { .. } => {
             let settings = ts::get_settings(config, &cli.subcommand)?;
