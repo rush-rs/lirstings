@@ -47,9 +47,6 @@ pub enum Command {
 
         #[arg(short = 'R', long, value_delimiter = ',')]
         ranges: Vec<Range>,
-
-        #[arg(short, long, default_value = "0")]
-        gobble: usize,
     },
     Inline {
         file_ext: String,
@@ -112,20 +109,10 @@ fn main() -> Result<()> {
             print(include_str!("./lirstings.tex"));
             return Ok(());
         }
-        Command::TreeSitter {
-            file,
-            ranges,
-            gobble,
-            ..
-        } if ranges.is_empty() => (read_file_and_gobble(file, *gobble)?, None),
-        Command::Ansi { file } => (read_file_and_gobble(file, 0)?, None),
-        Command::TreeSitter {
-            file,
-            ranges,
-            gobble,
-            ..
-        } => {
-            let raw = read_file_and_gobble(file, *gobble)?;
+        Command::TreeSitter { file, ranges, .. } if ranges.is_empty() => (read_file(file)?, None),
+        Command::Ansi { file } => (read_file(file)?, None),
+        Command::TreeSitter { file, ranges, .. } => {
+            let raw = read_file(file)?;
             let lines: Vec<_> = raw.lines().collect();
             let mut code = String::new();
             let mut line_numbers = vec![];
@@ -160,6 +147,17 @@ fn main() -> Result<()> {
         }
         Command::Inline { code, .. } => (code.join(" "), None),
     };
+    let gobble = code
+        .lines()
+        .map(|line| line.chars().take_while(|char| *char == ' ').count())
+        .min()
+        .unwrap_or(0);
+    if gobble > 0 {
+        code = code
+            .lines()
+            .flat_map(|line| line.chars().skip(gobble).chain(iter::once('\n')))
+            .collect::<String>();
+    }
     code.truncate(code.trim_end_matches('\n').len());
 
     let (output, hash) = match &cli.subcommand {
@@ -221,14 +219,8 @@ fn print(input: &str) {
     _ = stdout.write_all(input.as_bytes());
 }
 
-fn read_file_and_gobble(path: &Path, gobble: usize) -> Result<String> {
+fn read_file(path: &Path) -> Result<String> {
     let raw_code = fs::read_to_string(path)
         .with_context(|| format!("Could not read input file at `{}`", path.to_string_lossy()))?;
-    if gobble > 0 {
-        return Ok(raw_code
-            .lines()
-            .flat_map(|line| line.chars().skip(gobble).chain(iter::once('\n')))
-            .collect::<String>());
-    }
     Ok(raw_code)
 }

@@ -46,7 +46,6 @@
     bool ansi=false,
     bool raw=false,
     bool raw queries=false,
-    gobble,
     fancyvrb,
 ][1]{
     °\def\args{}°
@@ -71,10 +70,6 @@
     % set `--ranges` flag if `ranges` is set
     \ifcommandkey{ranges}{°\expandafter\def\expandafter\commandargs\expandafter{\commandargs%
         --ranges '\commandkey{ranges}'
-    }°}{}
-    % set `--gobble` flag if `gobble` is set
-    \ifcommandkey{gobble}{°\expandafter\def\expandafter\commandargs\expandafter{\commandargs%
-        --gobble '\commandkey{gobble}'
     }°}{}
     % set `--fancyvrb-args` flag
     °\expandafter\def\expandafter\commandargs\expandafter{\commandargs%
