@@ -93,11 +93,17 @@ pub fn highlight(
     line_numbers: Option<Vec<RangeInclusive<usize>>>,
     cli: &Cli,
     mut settings: Settings,
+    file_name: Option<String>,
 ) -> Result<String> {
     let inline = matches!(&cli.subcommand, Command::Inline { .. });
     let mut output = match line_numbers {
-        Some(numbers) => Output::new(numbers.into_iter().flatten(), inline, &cli.fancyvrb_args),
-        None => Output::new(1.., inline, &cli.fancyvrb_args),
+        Some(numbers) => Output::new(
+            numbers.into_iter().flatten(),
+            inline,
+            &cli.fancyvrb_args,
+            file_name,
+        ),
+        None => Output::new(1.., inline, &cli.fancyvrb_args, file_name),
     };
 
     if !matches!(

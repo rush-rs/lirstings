@@ -47,6 +47,9 @@ pub enum Command {
 
         #[arg(short = 'R', long, value_delimiter = ',')]
         ranges: Vec<Range>,
+
+        #[arg(short, long)]
+        filename_strip_prefix: Option<PathBuf>,
     },
     Inline {
         file_ext: String,
@@ -175,23 +178,57 @@ fn main() -> Result<()> {
                 hash,
             )
         }
-        Command::TreeSitter { raw: true, .. } => {
-            let hash = cache::hash((&cli, &code, None::<String>));
-            if let Some(cached) = cache.get_cached(hash) {
-                eprintln!("{CACHE_SKIP_MESSAGE}");
-                print(cached);
-                return Ok(());
-            }
-            let mut output = match line_numbers {
-                Some(numbers) => {
-                    Output::new(numbers.into_iter().flatten(), false, &cli.fancyvrb_args)
-                }
-                None => Output::new(1.., false, &cli.fancyvrb_args),
+        Command::TreeSitter {
+            raw,
+            file,
+            filename_strip_prefix,
+            ..
+        } => {
+            let filename = match filename_strip_prefix {
+                Some(prefix) => Some(
+                    file.strip_prefix(prefix)
+                        .with_context(|| "failed to strip prefix from filename")?
+                        .to_string_lossy()
+                        .into_owned(),
+                ),
+                None => None,
             };
-            output.push_str(&code.replace('{', "×{").replace('}', "×}"));
-            (output.finish(), hash)
+            if *raw {
+                let hash = cache::hash((&cli, &code, None::<String>));
+                if let Some(cached) = cache.get_cached(hash) {
+                    eprintln!("{CACHE_SKIP_MESSAGE}");
+                    print(cached);
+                    return Ok(());
+                }
+                let mut output = match line_numbers {
+                    Some(numbers) => Output::new(
+                        numbers.into_iter().flatten(),
+                        false,
+                        &cli.fancyvrb_args,
+                        filename,
+                    ),
+                    None => Output::new(1.., false, &cli.fancyvrb_args, filename),
+                };
+                output.push_str(&code.replace('{', "×{").replace('}', "×}"));
+                (output.finish(), hash)
+            } else {
+                let settings = ts::get_settings(config, &cli.subcommand)?;
+                let hash_query = settings.highlights_query.clone()
+                    + &settings.injection_query
+                    + &settings.locals_query;
+                let hash = cache::hash((&cli, &code, Some(hash_query)));
+                if let Some(cached) = cache.get_cached(hash) {
+                    eprintln!("{CACHE_SKIP_MESSAGE}");
+                    print(cached);
+                    return Ok(());
+                }
+                (
+                    ts::highlight(&code, line_numbers, &cli, settings, filename)?,
+                    hash,
+                )
+            }
         }
-        Command::TreeSitter { .. } | Command::Inline { .. } => {
+        Command::Inline { .. } => {
             let settings = ts::get_settings(config, &cli.subcommand)?;
             let hash_query = settings.highlights_query.clone()
                 + &settings.injection_query
@@ -202,7 +239,10 @@ fn main() -> Result<()> {
                 print(cached);
                 return Ok(());
             }
-            (ts::highlight(&code, line_numbers, &cli, settings)?, hash)
+            (
+                ts::highlight(&code, line_numbers, &cli, settings, None)?,
+                hash,
+            )
         }
     };
     print(&output);

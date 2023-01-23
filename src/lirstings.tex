@@ -14,8 +14,7 @@
     frame=lines,
     numbersep=12pt,
     rulecolor=\color{hint},
-    framesep=2\fboxsep,
-    labelposition=bottomline,
+    framesep=3\fboxsep,
     baselinestretch=0.8,
 }
 \newcounter{LirstingsLineNo}
@@ -46,19 +45,11 @@
     bool ansi=false,
     bool raw=false,
     bool raw queries=false,
+    path prefix,
     fancyvrb,
 ][1]{
-    °\def\args{}°
     °\def\commandargs{}°
 %
-    % set `label` if `caption` is set and `float` is unset
-    \ifcommandkey{caption}{
-        \ifcommandkey{float}{}{
-            °\expandafter\def\expandafter\args\expandafter{\args%
-                label=\textnormal{\color{black}\commandkey{caption}},
-            }°
-        }
-    }{}
     % set `--raw` flag if `raw` is true
     \if\commandkey{raw}1°\expandafter\def\expandafter\commandargs\expandafter{\commandargs%
         --raw
@@ -71,9 +62,13 @@
     \ifcommandkey{ranges}{°\expandafter\def\expandafter\commandargs\expandafter{\commandargs%
         --ranges '\commandkey{ranges}'
     }°}{}
+    % set `--filename-strip-prefix` flag if `path prefix` is set
+    \ifcommandkey{path prefix}{°\expandafter\def\expandafter\commandargs\expandafter{\commandargs%
+        --filename-strip-prefix '\commandkey{path prefix}'
+    }°}{}
     % set `--fancyvrb-args` flag
     °\expandafter\def\expandafter\commandargs\expandafter{\commandargs%
-        --fancyvrb-args '\args\commandkey{fancyvrb}'
+        --fancyvrb-args '\commandkey{fancyvrb}'
     }°
 %
     % begin float if `float` is set

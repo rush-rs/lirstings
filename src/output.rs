@@ -11,13 +11,17 @@ impl Output {
         mut line_numbers: impl Iterator<Item = usize> + 'static,
         inline: bool,
         extra_args: &str,
+        filename: Option<String>,
     ) -> Self {
         let first_number = line_numbers.next().unwrap_or_default();
+        let label = filename
+            .map(|filename| format!("label={{\\footnotesize {filename}}},"))
+            .unwrap_or_default();
         Self {
             line_numbers: Box::new(line_numbers),
             output_string: match inline {
                 true => "\\Verb[commandchars=×\\{\\}]{".to_string(),
-                false => format!("\\begin{{Verbatim}}[commandchars=×\\{{\\}},{extra_args}]\n{SET_COUNTER_COMMAND}{{{first_number}}}"),
+                false => format!("\\begin{{Verbatim}}[commandchars=×\\{{\\}},{label}{extra_args}]\n{SET_COUNTER_COMMAND}{{{first_number}}}"),
             },
             inline,
         }
