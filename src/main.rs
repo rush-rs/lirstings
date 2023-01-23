@@ -143,7 +143,7 @@ fn main() -> Result<()> {
                     .with_context(|| "range out of bounds for input file")?
                     .join("\n");
                 code += "\n";
-                line_numbers.push(range.start..=range.end);
+                line_numbers.push(range.start + 1..=range.end + 1);
             }
             (code, Some(line_numbers))
         }
