@@ -195,6 +195,16 @@ fn process_queries(lang: Language, source: &str) -> Result<String> {
                                 ],
                             ),
                         )),
+                        "contains?" => Some((
+                            "#contains?",
+                            (
+                                "#match?",
+                                vec![
+                                    clone_predicate_arg(&predicate.args[0]),
+                                    clone_predicate_arg(&predicate.args[1]),
+                                ],
+                            ),
+                        )),
                         _ => None,
                     })
                     .collect::<HashMap<_, _>>(),
