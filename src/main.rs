@@ -149,6 +149,7 @@ fn main() -> Result<()> {
     };
     let gobble = code
         .lines()
+        .filter(|line| !line.is_empty())
         .map(|line| line.chars().take_while(|char| *char == ' ').count())
         .min()
         .unwrap_or(0);
