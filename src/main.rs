@@ -62,7 +62,7 @@ pub enum Command {
     TexInclude,
 }
 
-#[derive(Debug, Clone, Copy, Hash)]
+#[derive(Debug, Clone, Copy, Hash, Default)]
 pub struct Range {
     start: usize,
     end: usize,
@@ -129,12 +129,22 @@ fn main() -> Result<()> {
             let lines: Vec<_> = raw.lines().collect();
             let mut code = String::new();
             let mut line_numbers = vec![];
+            let mut prev_range = Range::default();
             for (index, range) in ranges.iter().enumerate() {
                 if index != 0 {
-                    let indent = lines[range.start]
-                        .chars()
-                        .take_while(|char| *char == ' ')
-                        .count();
+                    // take the larger indent from...
+                    let indent = usize::max(
+                        // ...the last line of the previous range and...
+                        lines[prev_range.end]
+                            .chars()
+                            .take_while(|char| *char == ' ')
+                            .count(),
+                        // ...the first line of the following range.
+                        lines[range.start]
+                            .chars()
+                            .take_while(|char| *char == ' ')
+                            .count(),
+                    );
                     code += &format!("{}// ...\n", " ".repeat(indent));
                     line_numbers.push(0..=0);
                 }
@@ -144,6 +154,7 @@ fn main() -> Result<()> {
                     .join("\n");
                 code += "\n";
                 line_numbers.push(range.start + 1..=range.end + 1);
+                prev_range = *range;
             }
             (code, Some(line_numbers))
         }
