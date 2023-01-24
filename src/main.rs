@@ -64,6 +64,7 @@ pub enum Command {
 
 #[derive(Debug, Clone, Copy, Hash, Default)]
 pub struct Range {
+    inline: bool,
     start: usize,
     end: usize,
 }
@@ -75,8 +76,10 @@ impl FromStr for Range {
         let (start, end) = s
             .split_once('-')
             .with_context(|| "no `-` found in range literal")?;
+        let inline = start.trim().starts_with('_');
         let start = start
             .trim()
+            .trim_start_matches('_')
             .parse::<usize>()
             .with_context(|| "failed to parse range start literal")?
             .checked_sub(1)
@@ -90,7 +93,7 @@ impl FromStr for Range {
         if start > end {
             bail!("range start is higher than range end");
         }
-        Ok(Self { start, end })
+        Ok(Self { inline, start, end })
     }
 }
 
@@ -121,29 +124,43 @@ fn main() -> Result<()> {
             let mut line_numbers = vec![];
             let mut prev_range = Range::default();
             for (index, range) in ranges.iter().enumerate() {
+                let mut range_offset = 0;
                 if index != 0 {
-                    // take the larger indent from...
-                    let indent = usize::max(
-                        // ...the last line of the previous range and...
-                        lines[prev_range.end]
-                            .chars()
-                            .take_while(|char| *char == ' ')
-                            .count(),
-                        // ...the first line of the following range.
-                        lines[range.start]
-                            .chars()
-                            .take_while(|char| *char == ' ')
-                            .count(),
-                    );
-                    code += &format!("{}// ...\n", " ".repeat(indent));
-                    line_numbers.push(0..=0);
+                    if range.inline {
+                        // remove previous newline
+                        code.truncate(code.len() - 1);
+
+                        // add comment and following line
+                        code += "/* ... */";
+                        code += lines[range.start].trim_start();
+                        code.push('\n');
+
+                        // set range offset
+                        range_offset = 1;
+                    } else {
+                        // take the larger indent from...
+                        let indent = usize::max(
+                            // ...the last line of the previous range and...
+                            lines[prev_range.end]
+                                .chars()
+                                .take_while(|char| *char == ' ')
+                                .count(),
+                            // ...the first line of the following range.
+                            lines[range.start]
+                                .chars()
+                                .take_while(|char| *char == ' ')
+                                .count(),
+                        );
+                        code += &format!("{}// ...\n", " ".repeat(indent));
+                        line_numbers.push(0..=0);
+                    }
                 }
                 code += &lines
-                    .get(range.start..=range.end)
+                    .get(range.start + range_offset..=range.end)
                     .with_context(|| "range out of bounds for input file")?
                     .join("\n");
-                code += "\n";
-                line_numbers.push(range.start + 1..=range.end + 1);
+                code.push('\n');
+                line_numbers.push(range.start + range_offset + 1..=range.end + 1);
                 prev_range = *range;
             }
             (code, Some(line_numbers))
