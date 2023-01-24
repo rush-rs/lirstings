@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone, Hash)]
 #[serde(untagged)]
 pub enum ThemeValue {
     Color(String),

@@ -10,6 +10,8 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
 
+use crate::{config::Config, Cli};
+
 pub const CACHE_FILE_PATH: &str = "lirstings.cache.json";
 pub const CACHE_SKIP_MESSAGE: &str = "lirstings: skipping generation of cached input";
 pub const CACHE_WRITE_MESSAGE: &str = "lirstings: written to cache";
@@ -32,12 +34,9 @@ impl Cache {
     }
 }
 
-pub fn hash<T>(obj: T) -> u64
-where
-    T: Hash,
-{
+pub fn hash(cli: &Cli, code: &str, config: &Config, queries: Option<String>) -> u64 {
     let mut hasher = DefaultHasher::new();
-    obj.hash(&mut hasher);
+    (cli, code, config, queries).hash(&mut hasher);
     hasher.finish()
 }
 

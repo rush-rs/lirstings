@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::BTreeMap,
     fs::{self, File},
     io::{BufReader, Write},
     path::{Path, PathBuf},
@@ -11,9 +11,9 @@ use serde::Deserialize;
 
 pub const CONFIG_FILE_PATH: &str = "lirstings.json";
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone, Hash)]
 pub struct Config {
-    pub theme: HashMap<String, ThemeValue>,
+    pub theme: BTreeMap<String, ThemeValue>,
     pub query_search_dirs: Vec<String>,
     pub parser_search_dirs: Vec<PathBuf>,
     pub ansi_colors: Vec<String>,

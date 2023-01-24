@@ -167,7 +167,7 @@ fn main() -> Result<()> {
     let (output, hash) = match &cli.subcommand {
         Command::TexInclude => unreachable!("`tex-include` subcommand immediately returns"),
         Command::Ansi { .. } => {
-            let hash = cache::hash((&cli, &code, None::<String>));
+            let hash = cache::hash(&cli, &code, &config, None);
             if let Some(cached) = cache.get_cached(hash) {
                 eprintln!("{CACHE_SKIP_MESSAGE}");
                 print(cached);
@@ -194,7 +194,7 @@ fn main() -> Result<()> {
                 None => None,
             };
             if *raw {
-                let hash = cache::hash((&cli, &code, None::<String>));
+                let hash = cache::hash(&cli, &code, &config, None);
                 if let Some(cached) = cache.get_cached(hash) {
                     eprintln!("{CACHE_SKIP_MESSAGE}");
                     print(cached);
@@ -212,11 +212,11 @@ fn main() -> Result<()> {
                 output.push_str(&code.replace('{', "×{").replace('}', "×}"));
                 (output.finish(), hash)
             } else {
-                let settings = ts::get_settings(config, &cli.subcommand)?;
+                let settings = ts::get_settings(config.clone(), &cli.subcommand)?;
                 let hash_query = settings.highlights_query.clone()
                     + &settings.injection_query
                     + &settings.locals_query;
-                let hash = cache::hash((&cli, &code, Some(hash_query)));
+                let hash = cache::hash(&cli, &code, &config, Some(hash_query));
                 if let Some(cached) = cache.get_cached(hash) {
                     eprintln!("{CACHE_SKIP_MESSAGE}");
                     print(cached);
@@ -229,11 +229,11 @@ fn main() -> Result<()> {
             }
         }
         Command::Inline { .. } => {
-            let settings = ts::get_settings(config, &cli.subcommand)?;
+            let settings = ts::get_settings(config.clone(), &cli.subcommand)?;
             let hash_query = settings.highlights_query.clone()
                 + &settings.injection_query
                 + &settings.locals_query;
-            let hash = cache::hash((&cli, &code, Some(hash_query)));
+            let hash = cache::hash(&cli, &code, &config, Some(hash_query));
             if let Some(cached) = cache.get_cached(hash) {
                 eprintln!("{CACHE_SKIP_MESSAGE}");
                 print(cached);
