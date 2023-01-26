@@ -1,6 +1,7 @@
 \usepackage{keycommand}
 \usepackage{fvextra}
 \usepackage{float}
+\usepackage{wrapfig}
 \usepackage[labelformat=simple]{caption}
 \usepackage[normalem]{ulem}
 
@@ -42,6 +43,8 @@
     caption,
     label,
     float,
+    wrap,
+    wrap width=0.5\textwidth,
     bool ansi=false,
     bool raw=false,
     bool raw queries=false,
@@ -73,6 +76,7 @@
 %
     % begin float if `float` is set
     \ifcommandkey{float}{°\begin{listing}°[\commandkey{float}]}{}
+    \ifcommandkey{wrap}{°\begin{wrapfloat}{listing}°{\commandkey{wrap}}{\commandkey{wrap width}}}{}
     % actual input of code
     \if\commandkey{ansi}1%
         °\input°{|"lirstings ansi #1 °\commandargs°"}%
@@ -84,5 +88,10 @@
             \ifcommandkey{caption}{°\caption{\commandkey{caption}}°}{}
             \ifcommandkey{label}{°\label{\commandkey{label}}°}{}
         °\end{listing}°
+    }{}
+    \ifcommandkey{wrap}{
+            \ifcommandkey{caption}{°\caption{\commandkey{caption}}°}{}
+            \ifcommandkey{label}{°\label{\commandkey{label}}°}{}
+        °\end{wrapfloat}°
     }{}
 }
