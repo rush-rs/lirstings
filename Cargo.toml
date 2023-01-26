@@ -10,6 +10,7 @@ edition = "2021"
 anyhow = "1.0.66"
 clap = { version = "4.0.18", features = ["derive"] }
 glob = "0.3.0"
+regex = "1.7.1"
 serde = { version = "1.0.147", features = ["derive"] }
 serde_json = "1.0.87"
 tree-sitter = "0.20.9"

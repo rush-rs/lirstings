@@ -5,14 +5,14 @@ use std::{
     iter,
     path::{Path, PathBuf},
     process,
-    str::FromStr,
 };
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 
 use cache::{CACHE_FILE_PATH, CACHE_SKIP_MESSAGE, CACHE_WRITE_MESSAGE};
 use config::CONFIG_FILE_PATH;
+use range::Range;
 
 use crate::output::Output;
 
@@ -20,6 +20,7 @@ mod ansi;
 mod cache;
 mod config;
 mod output;
+mod range;
 mod theme;
 mod ts;
 
@@ -60,41 +61,6 @@ pub enum Command {
     },
     #[command(visible_aliases = ["tex", "include", "include-tex"])]
     TexInclude,
-}
-
-#[derive(Debug, Clone, Copy, Hash, Default)]
-pub struct Range {
-    inline: bool,
-    start: usize,
-    end: usize,
-}
-
-impl FromStr for Range {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (start, end) = s
-            .split_once('-')
-            .with_context(|| "no `-` found in range literal")?;
-        let inline = start.trim().starts_with('_');
-        let start = start
-            .trim()
-            .trim_start_matches('_')
-            .parse::<usize>()
-            .with_context(|| "failed to parse range start literal")?
-            .checked_sub(1)
-            .with_context(|| "line number 0 does not exist")?;
-        let end = end
-            .trim()
-            .parse::<usize>()
-            .with_context(|| "failed to parse range end literal")?
-            .checked_sub(1)
-            .with_context(|| "line number 0 does not exist")?;
-        if start > end {
-            bail!("range start is higher than range end");
-        }
-        Ok(Self { inline, start, end })
-    }
 }
 
 fn main() -> Result<()> {
@@ -139,18 +105,19 @@ fn main() -> Result<()> {
                         range_offset = 1;
                     } else {
                         // take the larger indent from...
-                        let indent = usize::max(
-                            // ...the last line of the previous range and...
-                            lines[prev_range.end]
-                                .chars()
-                                .take_while(|char| *char == ' ')
-                                .count(),
-                            // ...the first line of the following range.
-                            lines[range.start]
-                                .chars()
-                                .take_while(|char| *char == ' ')
-                                .count(),
-                        );
+                        let indent = range.indent_offset
+                            + usize::max(
+                                // ...the last line of the previous range and...
+                                lines[prev_range.end]
+                                    .chars()
+                                    .take_while(|char| *char == ' ')
+                                    .count(),
+                                // ...the first line of the following range.
+                                lines[range.start]
+                                    .chars()
+                                    .take_while(|char| *char == ' ')
+                                    .count(),
+                            );
                         code += &format!("{}// ...\n", " ".repeat(indent));
                         line_numbers.push(0..=0);
                     }
