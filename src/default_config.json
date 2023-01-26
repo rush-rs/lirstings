@@ -1,6 +1,7 @@
 {
   "query_search_dirs": ["./tree-sitter/**/queries/"],
   "parser_search_dirs": ["./tree-sitter/"],
+  "comment_map": {},
   "theme": {
     "annotation": "#383a42",
     "attribute": "#0184bc",

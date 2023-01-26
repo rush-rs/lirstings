@@ -86,6 +86,9 @@ fn main() -> Result<()> {
         Command::TreeSitter { file, ranges, .. } => {
             let raw = read_file(file)?;
             let lines: Vec<_> = raw.lines().collect();
+            let comment_style = file
+                .extension()
+                .and_then(|ext| config.comment_map.get(ext.to_string_lossy().as_ref()));
             let mut code = String::new();
             let mut line_numbers = vec![];
             let mut prev_range = Range::default();
@@ -97,7 +100,9 @@ fn main() -> Result<()> {
                         code.truncate(code.len() - 1);
 
                         // add comment and following line
-                        code += "/* ... */";
+                        code += comment_style.map_or("/*", |style| &style.block.0);
+                        code += " ... ";
+                        code += comment_style.map_or("*/", |style| &style.block.1);
                         code += lines[range.start].trim_start();
                         code.push('\n');
 
@@ -118,7 +123,11 @@ fn main() -> Result<()> {
                                     .take_while(|char| *char == ' ')
                                     .count(),
                             );
-                        code += &format!("{}// ...\n", " ".repeat(indent));
+                        code += &format!(
+                            "{}{} ...\n",
+                            " ".repeat(indent),
+                            comment_style.map_or("//", |style| &style.line)
+                        );
                         line_numbers.push(0..=0);
                     }
                 }

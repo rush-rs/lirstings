@@ -17,6 +17,13 @@ pub struct Config {
     pub query_search_dirs: Vec<String>,
     pub parser_search_dirs: Vec<PathBuf>,
     pub ansi_colors: Vec<String>,
+    pub comment_map: BTreeMap<String, CommentStyle>,
+}
+
+#[derive(Deserialize, Clone, Hash)]
+pub struct CommentStyle {
+    pub line: String,
+    pub block: (String, String),
 }
 
 pub fn read() -> Result<Option<Config>> {
