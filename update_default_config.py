@@ -54,15 +54,18 @@ colors = {
 
 theme = {}
 
+for name, value in colors.items():
+    theme[name] = value
+
 for match in groups_re.finditer(highlights_lua):
     if match.group(2) is not None:
-        theme[match.group(1)] = colors[colors_map[match.group(2)]]
+        theme[match.group(1)] = '$' + colors_map[match.group(2)]
     elif (
         match.group(4) is not None and code_style[match.group(4)] is None
     ) or (match.group(6) is not None and match.group(6) not in allowed_fmts):
-        theme[match.group(1)] = colors[match.group(3)]
+        theme[match.group(1)] = '$' + match.group(3)
     else:
-        theme[match.group(1)] = {'color': colors[match.group(3)]}
+        theme[match.group(1)] = {'link': match.group(3)}
         if (
             match.group(4) is not None
             and code_style[match.group(4)] is not None

@@ -14,7 +14,7 @@ use cache::{CACHE_FILE_PATH, CACHE_SKIP_MESSAGE, CACHE_WRITE_MESSAGE};
 use config::CONFIG_FILE_PATH;
 use range::Range;
 
-use crate::output::Output;
+use crate::{config::Config, output::Output};
 
 mod ansi;
 mod cache;
@@ -66,12 +66,15 @@ pub enum Command {
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    let config = config::read()
+    let mut config = Config::read()
         .with_context(|| format!("could not read or create config file at `{CONFIG_FILE_PATH}`"))?
         .unwrap_or_else(|| {
             eprintln!("New configuration file was created at `{CONFIG_FILE_PATH}`");
-            process::exit(200)
+            process::exit(200);
         });
+    config
+        .resolve_links()
+        .with_context(|| "invalid config file")?;
 
     let mut cache = cache::read()
         .with_context(|| format!("could not read or create cache file at `{CACHE_FILE_PATH}`"))?;
