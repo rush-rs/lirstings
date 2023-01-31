@@ -34,7 +34,7 @@ pub fn get_settings(config: Config, subcommand: &Command) -> Result<Settings> {
     let (lang, lang_config) = match match &subcommand {
         Command::TreeSitter { file, .. } => loader.language_configuration_for_file_name(file)?,
         Command::Inline { file_ext, .. } => loader
-            .language_configuration_for_file_name(&PathBuf::from(format!("file.{}", file_ext)))?,
+            .language_configuration_for_file_name(&PathBuf::from(format!("file.{file_ext}")))?,
         Command::Ansi { .. } => panic!("`ts::get_settings` called with `ansi` subcommand"),
         Command::TexInclude => unreachable!("`tex-include` subcommand immediately returns"),
     } {
@@ -54,7 +54,6 @@ pub fn get_settings(config: Config, subcommand: &Command) -> Result<Settings> {
     let mut locals_query = String::new();
     for glob_str in &config.query_search_dirs {
         for dir in glob::glob(glob_str)?.filter_map(Result::ok) {
-            #[allow(clippy::needless_borrow)] // wrongly detected
             let filetype_dir = dir.join(&parser_name);
             let highlights_file = filetype_dir.join("highlights.scm");
             let injection_file = filetype_dir.join("injections.scm");
