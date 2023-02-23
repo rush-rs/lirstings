@@ -137,8 +137,12 @@ fn main() -> Result<()> {
                 code += &lines
                     .get(range.start + range_offset..=range.end)
                     .with_context(|| "range out of bounds for input file")?
-                    .join("\n");
-                code.push('\n');
+                    .iter()
+                    .fold(String::new(), |mut acc, line| {
+                        acc += line;
+                        acc.push('\n');
+                        acc
+                    });
                 line_numbers.push(range.start + range_offset + 1..=range.end + 1);
                 prev_range = *range;
             }
