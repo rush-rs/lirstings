@@ -101,9 +101,8 @@ pub fn highlight(
             inline,
             &cli.fancyvrb_args,
             file_name,
-            cli.size(),
         ),
-        None => Output::new(1.., inline, &cli.fancyvrb_args, file_name, cli.size()),
+        None => Output::new(1.., inline, &cli.fancyvrb_args, file_name),
     };
 
     if !matches!(

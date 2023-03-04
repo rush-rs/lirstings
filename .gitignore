@@ -1,9 +1,3 @@
 /target
 /lirstings.json
 /lirstings.cache.json
-
-# Latex cache files
-/src/lirstings.aux
-/src/lirstings.fls
-/src/lirstings.fdb_latexmk
-/src/lirstings.log
