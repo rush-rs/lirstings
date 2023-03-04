@@ -1,5 +1,6 @@
 // TODO: write README.md
 use std::{
+    fmt::Display,
     fs,
     io::{self, Write},
     iter,
@@ -8,7 +9,7 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 
 use cache::{CACHE_FILE_PATH, CACHE_SKIP_MESSAGE, CACHE_WRITE_MESSAGE};
 use config::CONFIG_FILE_PATH;
@@ -24,6 +25,33 @@ mod range;
 mod theme;
 mod ts;
 
+#[derive(ValueEnum, Hash, Clone, PartialEq, Eq)]
+pub enum Size {
+    Tiny,
+    Small,
+    NormalSize,
+}
+
+impl Default for Size {
+    fn default() -> Self {
+        Self::NormalSize
+    }
+}
+
+impl Display for Size {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Tiny => "\\tiny",
+                Self::Small => "\\small",
+                Self::NormalSize => "\\normalsize",
+            }
+        )
+    }
+}
+
 #[derive(Parser, Hash)]
 #[command(author, version, about)]
 pub struct Cli {
@@ -32,6 +60,15 @@ pub struct Cli {
 
     #[command(subcommand)]
     subcommand: Command,
+}
+
+impl Cli {
+    fn size(&self) -> Size {
+        match self.subcommand {
+            Command::TreeSitter { ref size, .. } => size.clone().unwrap_or_default(),
+            _ => Size::default(),
+        }
+    }
 }
 
 #[derive(Subcommand, Hash)]
@@ -51,6 +88,12 @@ pub enum Command {
 
         #[arg(short, long)]
         filename_strip_prefix: Option<PathBuf>,
+
+        #[arg(short, long, default_value = "0")]
+        gobble: usize,
+
+        #[arg(short = 's', long, value_enum)]
+        size: Option<Size>,
     },
     Inline {
         file_ext: String,
@@ -182,6 +225,7 @@ fn main() -> Result<()> {
             raw,
             file,
             filename_strip_prefix,
+            size,
             ..
         } => {
             let filename = match filename_strip_prefix {
@@ -206,8 +250,9 @@ fn main() -> Result<()> {
                         false,
                         &cli.fancyvrb_args,
                         filename,
+                        size.clone().unwrap_or_default(),
                     ),
-                    None => Output::new(1.., false, &cli.fancyvrb_args, filename),
+                    None => Output::new(1.., false, &cli.fancyvrb_args, filename, size.clone().unwrap_or_default()),
                 };
                 output.push_str(&code.replace('{', "×{").replace('}', "×}"));
                 (output.finish(), hash)

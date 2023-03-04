@@ -1,3 +1,5 @@
+use crate::Size;
+
 pub struct Output {
     line_numbers: Box<dyn Iterator<Item = usize>>,
     output_string: String,
@@ -12,6 +14,7 @@ impl Output {
         inline: bool,
         extra_args: &str,
         filename: Option<String>,
+        size: Size,
     ) -> Self {
         let first_number = line_numbers.next().unwrap_or_default();
         let label = filename
@@ -21,7 +24,7 @@ impl Output {
             line_numbers: Box::new(line_numbers),
             output_string: match inline {
                 true => "\\Verb[commandchars=×\\{\\}]{".to_string(),
-                false => format!("\\begin{{Verbatim}}[commandchars=×\\{{\\}},{label}{extra_args}]\n{SET_COUNTER_COMMAND}{{{first_number}}}"),
+                false => format!("\\begin{{Verbatim}}[commandchars=×\\{{\\}},fontsize={size},{label},{extra_args}]\n{SET_COUNTER_COMMAND}{{{first_number}}}"),
             },
             inline,
         }

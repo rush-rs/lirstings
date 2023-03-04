@@ -50,6 +50,7 @@
     bool raw queries=false,
     path prefix,
     fancyvrb,
+    size,
 ][1]{
     °\def\commandargs{}°
 %
@@ -73,6 +74,10 @@
     °\expandafter\def\expandafter\commandargs\expandafter{\commandargs%
         --fancyvrb-args '\commandkey{fancyvrb}'
     }°
+    % set `--size` flag if `size` is set
+    \ifcommandkey{size}{°\expandafter\def\expandafter\commandargs\expandafter{\commandargs%
+        --size '\commandkey{size}'
+    }°}{}
 %
     % begin float if `float` is set
     \ifcommandkey{float}{°\begin{listing}°[\commandkey{float}]}{}
