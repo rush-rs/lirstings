@@ -37,6 +37,7 @@ pub fn get_settings(config: Config, subcommand: &Command) -> Result<Settings> {
             .language_configuration_for_file_name(&PathBuf::from(format!("file.{file_ext}")))?,
         Command::Ansi { .. } => panic!("`ts::get_settings` called with `ansi` subcommand"),
         Command::TexInclude => unreachable!("`tex-include` subcommand immediately returns"),
+        Command::FromTex { .. } => unreachable!("`from-tex` subcommand immediately returns"),
     } {
         Some(conf) => conf,
         None => {

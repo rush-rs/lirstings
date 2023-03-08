@@ -19,6 +19,7 @@ use crate::{config::Config, output::Output};
 mod ansi;
 mod cache;
 mod config;
+mod from_tex;
 mod output;
 mod range;
 mod theme;
@@ -61,11 +62,17 @@ pub enum Command {
     },
     #[command(visible_aliases = ["tex", "include", "include-tex"])]
     TexInclude,
+    FromTex {
+        file: PathBuf,
+        args: String,
+    },
 }
 
 fn main() -> Result<()> {
-    let cli = Cli::parse();
+    run(Cli::parse())
+}
 
+fn run(cli: Cli) -> Result<()> {
     let mut config = Config::read()
         .with_context(|| format!("could not read or create config file at `{CONFIG_FILE_PATH}`"))?
         .unwrap_or_else(|| {
@@ -84,6 +91,7 @@ fn main() -> Result<()> {
             print(include_str!("./lirstings.tex"));
             return Ok(());
         }
+        Command::FromTex { file, args } => return from_tex::run(file, args),
         Command::TreeSitter { file, ranges, .. } if ranges.is_empty() => (read_file(file)?, None),
         Command::Ansi { file } => (read_file(file)?, None),
         Command::TreeSitter { file, ranges, .. } => {
@@ -166,6 +174,7 @@ fn main() -> Result<()> {
 
     let (output, hash) = match &cli.subcommand {
         Command::TexInclude => unreachable!("`tex-include` subcommand immediately returns"),
+        Command::FromTex { .. } => unreachable!("`from-tex` subcommand immediately returns"),
         Command::Ansi { .. } => {
             let hash = cache::hash(&cli, &code, &config, None);
             if let Some(cached) = cache.get_cached(hash) {
