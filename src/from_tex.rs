@@ -84,7 +84,7 @@ pub fn run(file: &Path, raw_args: &str) -> Result<()> {
     }
     if let Some(wrap) = args.get("wrap") {
         print(&format!(
-            "\\begin{{wrapfloat}}{{listing}}{{{wrap}}}{{{}}}\n",
+            "\\begin{{wrapfloat}}{{listing}}{{{wrap}}}{{{}}}\n\\vspace{{-1\\baselineskip}}\n",
             args.get("wrap width")
                 .map(|val| val.as_str())
                 .unwrap_or("0.5\\textwidth")
@@ -97,7 +97,9 @@ pub fn run(file: &Path, raw_args: &str) -> Result<()> {
     // end (wrap)float and set caption and label
     if args.contains_key("float") || args.contains_key("wrap") {
         if let Some(caption) = args.get("caption") {
-            print(&format!("\n\\caption{{{caption}}}"));
+            print(&format!(
+                "\n\\vspace{{-1\\baselineskip}}\\caption{{{caption}}}"
+            ));
         }
         if let Some(label) = args.get("label") {
             print(&format!("\\label{{{label}}}"));
