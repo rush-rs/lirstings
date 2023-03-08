@@ -1,6 +1,6 @@
 // TODO: write README.md
 use std::{
-    fs,
+    env, fs,
     io::{self, Write},
     iter,
     path::{Path, PathBuf},
@@ -88,7 +88,16 @@ fn run(cli: Cli) -> Result<()> {
 
     let (mut code, line_numbers) = match &cli.subcommand {
         Command::TexInclude => {
-            print(include_str!("./lirstings.tex"));
+            print(
+                &include_str!("./lirstings.tex").replace(
+                    "EXECUTABLE",
+                    &env::current_exe()
+                        .as_ref()
+                        .map(|path| path.to_string_lossy())
+                        .unwrap_or("lirstings".into())
+                        .replace('\'', "'\"'\"'"),
+                ),
+            );
             return Ok(());
         }
         Command::FromTex { file, args } => return from_tex::run(file, args),
