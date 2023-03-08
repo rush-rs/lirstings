@@ -194,12 +194,10 @@ fn run(cli: Cli) -> Result<()> {
             ..
         } => {
             let filename = match filename_strip_prefix {
-                Some(prefix) => Some(
-                    file.strip_prefix(prefix)
-                        .with_context(|| "failed to strip prefix from filename")?
-                        .to_string_lossy()
-                        .into_owned(),
-                ),
+                Some(prefix) => file
+                    .strip_prefix(prefix)
+                    .ok()
+                    .map(|path| path.to_string_lossy().into_owned()),
                 None => None,
             };
             if *raw {
