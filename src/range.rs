@@ -9,13 +9,16 @@ pub struct Range {
     pub indent_offset: Offset,
     pub start: usize,
     pub end: usize,
+    pub start_col: Option<usize>,
+    pub end_col: Option<usize>,
 }
 
 impl FromStr for Range {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let regex = Regex::from_str(r"^ *([+-]\d+|_)? *(\d+)-(\d+)$").unwrap();
+        let regex =
+            Regex::from_str(r"^ *([+-]\d+|_)? *(\d+)(?::(\d+))? *- *(\d+)(?::(\d+))? *$").unwrap();
         let groups = regex
             .captures(s)
             .with_context(|| "unable to parse range literal")?;
@@ -41,12 +44,31 @@ impl FromStr for Range {
             .with_context(|| "failed to parse range start literal")?
             .checked_sub(1)
             .with_context(|| "line number 0 does not exist")?;
-        let end = groups[3]
+        let end = groups[4]
             .parse::<usize>()
             .with_context(|| "failed to parse range end literal")?
             .checked_sub(1)
             .with_context(|| "line number 0 does not exist")?;
-        if start > end {
+        let start_col = match groups.get(3) {
+            Some(grp) => Some(
+                grp.as_str()
+                    .parse::<usize>()
+                    .with_context(|| "failed to parse range start column literal")?,
+            ),
+            None => None,
+        };
+        let end_col = match groups.get(5) {
+            Some(grp) => Some(
+                grp.as_str()
+                    .parse::<usize>()
+                    .with_context(|| "failed to parse range end column literal")?,
+            ),
+            None => None,
+        };
+        if start > end
+            || (start == end
+                && matches!((start_col, end_col), (Some(start), Some(end)) if start > end))
+        {
             bail!("range start is higher than range end");
         }
         Ok(Self {
@@ -54,6 +76,8 @@ impl FromStr for Range {
             indent_offset,
             start,
             end,
+            start_col,
+            end_col,
         })
     }
 }

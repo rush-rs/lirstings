@@ -112,6 +112,7 @@ fn run(cli: Cli) -> Result<()> {
             let mut code = String::new();
             let mut line_numbers = vec![];
             let mut prev_range = Range::default();
+            // TODO: prevent panics during indexing
             for (index, range) in ranges.iter().enumerate() {
                 let mut range_offset = 0;
                 if index != 0 {
@@ -123,7 +124,10 @@ fn run(cli: Cli) -> Result<()> {
                         code += comment_style.map_or("/*", |style| &style.block.0);
                         code += " ... ";
                         code += comment_style.map_or("*/", |style| &style.block.1);
-                        code += lines[range.start].trim_start();
+                        code += match range.start_col {
+                            Some(col) => &lines[range.start][col..],
+                            None => lines[range.start].trim_start(),
+                        };
                         code.push('\n');
 
                         // set range offset
@@ -155,6 +159,18 @@ fn run(cli: Cli) -> Result<()> {
                     .get(range.start + range_offset..=range.end)
                     .with_context(|| "range out of bounds for input file")?
                     .iter()
+                    .enumerate()
+                    .map(
+                        |(index, line)| match (index, range.start_col, range.end_col) {
+                            (0, Some(col), _) if range_offset == 0 => &line[col..],
+                            (idx, _, Some(col))
+                                if idx == range.end - range.start + range_offset =>
+                            {
+                                &line[..col]
+                            }
+                            _ => line,
+                        },
+                    )
                     .fold(String::new(), |mut acc, line| {
                         acc += line;
                         acc.push('\n');
