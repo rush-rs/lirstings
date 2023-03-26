@@ -84,7 +84,16 @@ pub fn run(file: &Path, raw_args: &str) -> Result<()> {
     if let Some(float) = args.get("float") {
         print(&format!(
             "\\begin{{listing}}[{float}]{}\n",
-            if continued { "\\ContinuedFloat" } else { "" },
+            if continued {
+                "\\ContinuedFloat"
+            } else if args
+                .get("start continued")
+                .map_or(false, |val| val == "true")
+            {
+                "\\ContinuedFloat*"
+            } else {
+                ""
+            },
         ));
     }
     if let Some(wrap) = args.get("wrap") {
