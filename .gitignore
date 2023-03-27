@@ -1,3 +1,6 @@
 /target
 /lirstings.json
 /lirstings.cache.json
+
+/src/lirstings.*
+!/src/lirstings.tex
