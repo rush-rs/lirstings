@@ -1,129 +1,74 @@
-use std::{collections::HashMap, fs, ops::RangeInclusive, path::PathBuf};
+use std::{collections::HashMap, ops::RangeInclusive};
 
-use anyhow::{bail, Context, Result};
-use tree_sitter::{Language, Query, QueryPredicateArg};
+use anyhow::Result;
+use tree_sitter::{Query, QueryPredicateArg};
 use tree_sitter_highlight::{Highlight, HighlightConfiguration, HighlightEvent, Highlighter};
-use tree_sitter_loader::Loader;
 
-use crate::{config::Config, output::Output, theme::ThemeValue, Cli, Command};
+use crate::{output::OutputWriter, renderer, theme::{Theme, ThemeValue}};
+
+use self::language_provider::{Language, LanguageProvider};
+
+pub mod language_provider;
 
 pub struct Settings {
     pub lang: Language,
     pub highlight_names: Vec<String>,
     pub highlight_styles: Vec<ThemeValue>,
-
-    pub highlights_query: String,
-    pub injection_query: String,
-    pub locals_query: String,
 }
 
-pub fn get_settings(config: Config, subcommand: &Command) -> Result<Settings> {
-    let mut highlight_names = Vec::with_capacity(config.theme.len());
-    let mut highlight_styles = Vec::with_capacity(config.theme.len());
-    for (key, value) in config.theme.into_iter() {
+pub fn get_settings(
+    provider: impl LanguageProvider,
+    theme: Theme,
+    file_extension: &str,
+) -> Result<Settings> {
+    let mut highlight_names = Vec::with_capacity(theme.highlights.len());
+    let mut highlight_styles = Vec::with_capacity(theme.highlights.len());
+    for (key, value) in theme.highlights.into_iter() {
         highlight_names.push(key);
         highlight_styles.push(value);
     }
 
-    let mut loader = Loader::new()?;
-    loader.configure_highlights(&highlight_names);
-    loader.find_all_languages(&tree_sitter_loader::Config {
-        parser_directories: config.parser_search_dirs,
-    })?;
-
-    let (lang, lang_config) = match match &subcommand {
-        Command::TreeSitter { file, .. } => loader.language_configuration_for_file_name(file)?,
-        Command::Inline { file_ext, .. } => loader
-            .language_configuration_for_file_name(&PathBuf::from(format!("file.{file_ext}")))?,
-        Command::Ansi { .. } => panic!("`ts::get_settings` called with `ansi` subcommand"),
-        Command::TexInclude => unreachable!("`tex-include` subcommand immediately returns"),
-        Command::FromTex { .. } => unreachable!("`from-tex` subcommand immediately returns"),
-    } {
-        Some(conf) => conf,
-        None => {
-            bail!("No matching tree-sitter configuration found");
-        }
-    };
-
-    let parser_name = match lang_config.scope.as_ref() {
-        Some(scope) => scope.replace("source.", ""),
-        None => bail!("Parser has no scope specified"),
-    };
-
-    let mut highlights_query = String::new();
-    let mut injection_query = String::new();
-    let mut locals_query = String::new();
-    for glob_str in &config.query_search_dirs {
-        for dir in glob::glob(glob_str)?.filter_map(Result::ok) {
-            let filetype_dir = dir.join(&parser_name);
-            let highlights_file = filetype_dir.join("highlights.scm");
-            let injection_file = filetype_dir.join("injections.scm");
-            let locals_file = filetype_dir.join("locals.scm");
-
-            // TODO: check for `; inherits: x` comments
-            if highlights_file.is_file() {
-                highlights_query = fs::read_to_string(&highlights_file).with_context(|| {
-                    format!("Could not read {}", highlights_file.to_string_lossy())
-                })?;
-            }
-            if injection_file.is_file() {
-                injection_query = fs::read_to_string(&injection_file).with_context(|| {
-                    format!("Could not read {}", injection_file.to_string_lossy())
-                })?;
-            }
-            if locals_file.is_file() {
-                locals_query = fs::read_to_string(&locals_file)
-                    .with_context(|| format!("Could not read {}", locals_file.to_string_lossy()))?;
-            }
-        }
-    }
-
     Ok(Settings {
-        lang,
+        lang: provider.provide(file_extension)?,
         highlight_names,
         highlight_styles,
-        highlights_query,
-        injection_query,
-        locals_query,
     })
 }
 
-pub fn highlight(
+pub fn highlight<Renderer: renderer::Renderer>(
     code: &str,
     line_numbers: Option<Vec<RangeInclusive<usize>>>,
-    cli: &Cli,
+    inline: bool,
+    raw_queries: bool,
+    fancyvrb_args: &str,
     mut settings: Settings,
-    file_name: Option<String>,
+    label: Option<String>,
 ) -> Result<String> {
-    let inline = matches!(&cli.subcommand, Command::Inline { .. });
-    let mut output = match line_numbers {
-        Some(numbers) => Output::new(
+    let mut writer = match line_numbers {
+        Some(numbers) => OutputWriter::<Renderer>::new(
             numbers.into_iter().flatten(),
             inline,
-            &cli.fancyvrb_args,
-            file_name,
+            fancyvrb_args,
+            label,
         ),
-        None => Output::new(1.., inline, &cli.fancyvrb_args, file_name),
+        None => OutputWriter::new(1.., inline, fancyvrb_args, label),
     };
 
-    if !matches!(
-        &cli.subcommand,
-        Command::TreeSitter {
-            raw_queries: true,
-            ..
-        }
-    ) {
-        settings.highlights_query = process_queries(settings.lang, &settings.highlights_query)?;
-        settings.injection_query = process_queries(settings.lang, &settings.injection_query)?;
-        settings.locals_query = process_queries(settings.lang, &settings.locals_query)?;
+    if !raw_queries {
+        settings.lang.highlights_query =
+            process_queries(settings.lang.inner, &settings.lang.highlights_query)?;
+        settings.lang.injection_query =
+            process_queries(settings.lang.inner, &settings.lang.injection_query)?;
+        settings.lang.locals_query =
+            process_queries(settings.lang.inner, &settings.lang.locals_query)?;
     }
 
     let mut highlighter = Highlighter::new();
     let mut highlight_config = HighlightConfiguration::new(
-        settings.lang,
-        &settings.highlights_query,
-        &settings.injection_query,
-        &settings.locals_query,
+        settings.lang.inner,
+        &settings.lang.highlights_query,
+        &settings.lang.injection_query,
+        &settings.lang.locals_query,
     )?;
     highlight_config.configure(&settings.highlight_names);
 
@@ -136,18 +81,18 @@ pub fn highlight(
                 style_stack.pop();
             }
             HighlightEvent::Source { start, end } => match style_stack.last() {
-                Some(highlight) => {
-                    output.push_str(&settings.highlight_styles[*highlight].write(&code[start..end]))
-                }
-                None => output.push_str(&code[start..end].replace('{', "×{").replace('}', "×}")),
+                Some(highlight) => writer.push_str(
+                    &settings.highlight_styles[*highlight].write::<Renderer>(&code[start..end]),
+                ),
+                None => writer.push_str(&Renderer::unstyled(&code[start..end])),
             },
         }
     }
 
-    Ok(output.finish())
+    Ok(writer.finish())
 }
 
-fn process_queries(lang: Language, source: &str) -> Result<String> {
+fn process_queries(lang: tree_sitter::Language, source: &str) -> Result<String> {
     let query = Query::new(lang, source)?;
     let start_bytes: Vec<_> = (0..query.pattern_count())
         .map(|index| {

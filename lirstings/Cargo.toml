@@ -1,0 +1,16 @@
+[package]
+name = "lirstings"
+version = "0.1.0"
+authors = ["RubixDev", "MikMuellerDev"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.66"
+serde = { version = "1.0.147", features = ["derive"] }
+regex = "1.7.3"
+
+# TODO: switch to crates-io versions in case the subcrates get published there
+tree-sitter = { package = "tree-sitter-c2rust", git = "https://github.com/shadaj/tree-sitter-c2rust" }
+tree-sitter-highlight = { git = "https://github.com/shadaj/tree-sitter-c2rust" }

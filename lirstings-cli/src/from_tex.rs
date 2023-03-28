@@ -6,8 +6,9 @@ use std::{
 };
 
 use anyhow::Result;
+use lirstings::Range;
 
-use crate::{print, range::Range, Cli, Command};
+use crate::{print, Cli, Command, OutputFormat};
 
 pub fn run(file: &Path, raw_args: &str) -> Result<()> {
     // parse arguments to HashMap
@@ -61,6 +62,7 @@ pub fn run(file: &Path, raw_args: &str) -> Result<()> {
     // construct Cli struct
     let cli = Cli {
         fancyvrb_args: args.remove("fancyvrb").unwrap_or_default(),
+        output_format: OutputFormat::Latex,
         subcommand: if args.get("ansi").map_or(false, |val| val == "true") {
             Command::Ansi {
                 file: file.to_path_buf(),

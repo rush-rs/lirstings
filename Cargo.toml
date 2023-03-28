@@ -1,18 +1,5 @@
-[package]
-name = "lirstings"
-version = "0.1.0"
-authors = ["RubixDev", "MikMuellerDev"]
-edition = "2021"
+[workspace]
+members = ["lirstings", "lirstings-cli", "tree-sitter-wasm-build-tool"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-anyhow = "1.0.66"
-clap = { version = "4.0.18", features = ["derive"] }
-glob = "0.3.0"
-regex = "1.7.1"
-serde = { version = "1.0.147", features = ["derive"] }
-serde_json = "1.0.87"
-tree-sitter = "0.20.9"
-tree-sitter-highlight = "0.20.1"
-tree-sitter-loader = "0.20.0"
+[patch.crates-io]
+tree-sitter-c2rust = { git = "https://github.com/shadaj/tree-sitter-c2rust" }
