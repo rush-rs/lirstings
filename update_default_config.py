@@ -74,13 +74,13 @@ for match in groups_re.finditer(highlights_lua):
         elif match.group(6) in allowed_fmts:
             theme[match.group(1)][match.group(6)] = True
 
-with open('src/default_config.json', 'r') as config_file:
+with open('lirstings-cli/src/default_config.json', 'r') as config_file:
     curr_conf = json.load(config_file)
 
 for key, value in theme.items():
     curr_conf['theme'][key] = value
 
-with open('src/default_config.json', 'w') as config_file:
+with open('lirstings-cli/src/default_config.json', 'w') as config_file:
     json.dump(
         curr_conf,
         config_file,
