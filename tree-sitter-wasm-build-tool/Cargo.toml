@@ -1,7 +1,13 @@
 [package]
-name = "tree-sitter-wasm-build-tool"
-version = "0.1.0"
+authors = ["RubixDev"]
+categories = ["development-tools::build-utils"]
+description = "A tool to help support building tree-sitter parsers for wasm"
 edition = "2021"
+keywords = ["tree-sitter", "wasm", "build"]
+license = "GPL-3.0-only"
+name = "tree-sitter-wasm-build-tool"
+repository = "https://github.com/rush-rs/lirstings"
+version = "0.1.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
