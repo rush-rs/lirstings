@@ -79,6 +79,7 @@ pub fn run(file: &Path, raw_args: &str) -> Result<()> {
     };
 
     let continued = args.get("continued").map_or(false, |val| val == "true");
+    let vspace = args.get("vspace").map_or("-1\\baselineskip", |val| val);
 
     // begin float or wrapfloat if set
     if let Some(float) = args.get("float") {
@@ -98,7 +99,7 @@ pub fn run(file: &Path, raw_args: &str) -> Result<()> {
     }
     if let Some(wrap) = args.get("wrap") {
         print(&format!(
-            "\\begin{{wrapfloat}}{{listing}}{{{wrap}}}{{{}}}\n\\vspace{{-1\\baselineskip}}\n",
+            "\\begin{{wrapfloat}}{{listing}}{{{wrap}}}{{{}}}\n\\vspace{{{vspace}}}\n",
             args.get("wrap width")
                 .map(|val| val.as_str())
                 .unwrap_or("0.5\\textwidth")
@@ -112,7 +113,7 @@ pub fn run(file: &Path, raw_args: &str) -> Result<()> {
     if args.contains_key("float") || args.contains_key("wrap") {
         if let Some(caption) = args.get("caption") {
             print(&format!(
-                "\n\\vspace{{-1\\baselineskip}}\\caption{{{caption}{}}}",
+                "\n\\vspace{{{vspace}}}\\caption{{{caption}{}}}",
                 if continued { " (cont.)" } else { "" },
             ));
         }
