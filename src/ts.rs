@@ -165,7 +165,32 @@ fn process_queries(lang: Language, source: &str) -> Result<String> {
                                     clone_predicate_arg(&predicate.args[0]),
                                     QueryPredicateArg::String(match &predicate.args[1] {
                                         QueryPredicateArg::String(str) => {
-                                            str.replace("%d", "\\\\d").into_boxed_str()
+                                            str.replace('\\', r"\\")
+                                                .replace("%.", r"\.")
+                                                .replace("%%", r"%")
+                                                .replace("%a", r"[a-zA-Z]")
+                                                .replace("%A", r"[^a-zA-Z]")
+                                                .replace("%c", r"[\0-\31]")
+                                                .replace("%C", r"[^\0-\31]")
+                                                .replace("%d", r"[0-9]")
+                                                .replace("%D", r"[^0-9]")
+                                                .replace("%g", r"[\33-\126]")
+                                                .replace("%G", r"[^\33-\126]")
+                                                .replace("%l", r"[a-z]")
+                                                .replace("%L", r"[^a-z]")
+                                                .replace("%p", r##"[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]"##)
+                                                .replace("%P", r##"[^!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]"##)
+                                                .replace("%s", r"[ \t\n\v\f\r]")
+                                                .replace("%S", r"[^ \t\n\v\f\r]")
+                                                .replace("%u", r"[A-Z]")
+                                                .replace("%U", r"[^A-Z]")
+                                                .replace("%w", r"[a-zA-Z0-9]")
+                                                .replace("%W", r"[^a-zA-Z0-9]")
+                                                .replace("%x", r"[0-9a-fA-F]")
+                                                .replace("%X", r"[^0-9a-fA-F]")
+                                                .replace("%z", r"\0")
+                                                .replace("%Z", r"[^\0]")
+                                                .into_boxed_str()
                                         }
                                         _ => panic!("second arg to #lua-match? must be string"),
                                     }),
